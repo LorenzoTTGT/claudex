@@ -43,6 +43,15 @@ install_dependencies() {
     export PATH="$HOME/.local/bin:$PATH"
   fi
 
+  if ! command -v codex >/dev/null 2>&1; then
+    printf 'Installing the OpenAI Codex CLI...\n'
+    if ! brew install --cask codex; then
+      printf 'Homebrew Codex installation failed; falling back to npm.\n'
+      command -v npm >/dev/null 2>&1 || brew install node
+      npm install --global @openai/codex
+    fi
+  fi
+
   command -v curl >/dev/null 2>&1 || {
     printf 'curl is required but was not found.\n' >&2
     exit 1
@@ -118,7 +127,7 @@ main() {
   printf 'Default model: gpt-5.6-terra\n'
   printf 'Default effort: high\n'
   printf 'Start it with: claudex\n'
-  printf 'Verify dependencies with: claude --version && cliproxyapi --help\n'
+  printf 'Verify dependencies with: claude --version && codex --version && cliproxyapi --help\n'
 }
 
 main

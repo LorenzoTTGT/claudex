@@ -24,10 +24,11 @@ The installer:
 
 1. Installs Homebrew if it is unavailable.
 2. Installs CLIProxyAPI using Homebrew.
-3. Installs Claude Code using Anthropic's official native installer.
-4. Generates a unique local proxy token.
-5. Installs the `claudex` launcher to `~/.local/bin`.
-6. Starts the Codex OAuth login when credentials are not already present.
+3. Installs Claude Code using Anthropic's official native installer when it is not found.
+4. Installs the OpenAI Codex CLI using Homebrew, with an npm fallback, when it is not found.
+5. Generates a unique local proxy token.
+6. Installs the `claudex` launcher to `~/.local/bin`.
+7. Starts the Codex OAuth login when credentials are not already present.
 
 Restart your shell after installation if `claudex` is not immediately found.
 
@@ -93,6 +94,7 @@ Update dependencies separately when needed:
 
 ```bash
 brew upgrade cliproxyapi
+brew upgrade --cask codex
 claude update
 ```
 
