@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/claudex"
+CONFIG_FILE="${CLAUDEX_PROXY_CONFIG:-$CONFIG_HOME/cliproxyapi.yaml}"
+TOKEN_FILE="${CLAUDEX_TOKEN_FILE:-$CONFIG_HOME/token}"
+BASE_URL="${CLAUDEX_BASE_URL:-http://127.0.0.1:8317}"
+MODEL="${CLAUDEX_MODEL:-gpt-5.6-terra}"
+EFFORT="${CLAUDEX_EFFORT:-high}"
+LOG_FILE="$CONFIG_HOME/cliproxyapi.log"
+
+find_binary() {
+  command -v "$1" 2>/dev/null || true
+}
+
+CLAUDE_BIN="${CLAUDE_BIN:-$(find_binary claude)}"
+PROXY_BIN="${CLIPROXYAPI_BIN:-$(find_binary cliproxyapi)}"
+
+if [[ -z "$CLAUDE_BIN" ]]; then
+  printf 'Claudex: Claude Code is not installed. Run the Claudex installer again.\n' >&2
+  exit 1
+fi
+
+if [[ -z "$PROXY_BIN" ]]; then
+  printf 'Claudex: CLIProxyAPI is not installed. Run the Claudex installer again.\n' >&2
+  exit 1
+fi
+
+if [[ ! -r "$CONFIG_FILE" || ! -r "$TOKEN_FILE" ]]; then
+  printf 'Claudex: setup is incomplete. Expected %s and %s.\n' "$CONFIG_FILE" "$TOKEN_FILE" >&2
+  exit 1
+fi
+
+TOKEN="$(<"$TOKEN_FILE")"
+
+proxy_ready() {
+  curl --silent --fail --max-time 2 \
+    -H "Authorization: Bearer $TOKEN" \
+    "$BASE_URL/v1/models" >/dev/null 2>&1
+}
+
+if ! proxy_ready; then
+  mkdir -p "$CONFIG_HOME"
+  nohup "$PROXY_BIN" -config "$CONFIG_FILE" >>"$LOG_FILE" 2>&1 &
+
+  for _ in {1..30}; do
+    proxy_ready && break
+    sleep 0.2
+  done
+fi
+
+if ! proxy_ready; then
+  printf 'Claudex: the local proxy did not become ready at %s.\n' "$BASE_URL" >&2
+  printf 'Check %s. Another service may already be using port 8317.\n' "$LOG_FILE" >&2
+  exit 1
+fi
+
+export ANTHROPIC_BASE_URL="$BASE_URL"
+export ANTHROPIC_AUTH_TOKEN="$TOKEN"
+export ANTHROPIC_MODEL="$MODEL"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="${CLAUDEX_OPUS_MODEL:-$MODEL}"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="${CLAUDEX_SONNET_MODEL:-$MODEL}"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="${CLAUDEX_HAIKU_MODEL:-gpt-5.6-luna}"
+
+if [[ "${CLAUDEX_SKIP_PERMISSIONS:-0}" == "1" ]]; then
+  exec "$CLAUDE_BIN" --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions "$@"
+fi
+
+exec "$CLAUDE_BIN" --model "$MODEL" --effort "$EFFORT" "$@"

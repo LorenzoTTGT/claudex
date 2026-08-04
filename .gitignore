@@ -1,0 +1,11 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+*.pid
+
+# Never commit local proxy credentials or generated configuration.
+token
+cliproxyapi.yaml
+.cli-proxy-api/

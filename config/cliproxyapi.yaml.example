@@ -1,0 +1,26 @@
+# Claudex keeps the proxy local to this computer.
+host: "127.0.0.1"
+port: 8317
+
+tls:
+  enable: false
+  cert: ""
+  key: ""
+
+auth-dir: "~/.cli-proxy-api"
+
+# install.sh replaces this placeholder with a random local-only token.
+api-keys:
+  - "__CLAUDEX_LOCAL_TOKEN__"
+
+remote-management:
+  allow-remote: false
+  secret-key: ""
+  disable-control-panel: true
+
+debug: false
+logging-to-file: false
+usage-statistics-enabled: false
+request-retry: 3
+routing:
+  strategy: "round-robin"
