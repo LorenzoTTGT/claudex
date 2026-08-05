@@ -54,21 +54,21 @@ proxy_ready || { printf 'Claudex: the local proxy did not become ready at %s.\nC
 export ANTHROPIC_BASE_URL="$BASE_URL"
 export ANTHROPIC_AUTH_TOKEN="$TOKEN"
 export ANTHROPIC_MODEL="$MODEL"
-export ANTHROPIC_DEFAULT_OPUS_MODEL="${CLAUDEX_OPUS_MODEL:-$MODEL}"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="${CLAUDEX_OPUS_MODEL:-$SOL_MODEL}"
 export ANTHROPIC_DEFAULT_SONNET_MODEL="${CLAUDEX_SONNET_MODEL:-$MODEL}"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="${CLAUDEX_HAIKU_MODEL:-gpt-5.6-luna}"
 
 claude_command() {
-  if [[ "${CLAUDEX_SKIP_PERMISSIONS:-0}" == "1" ]]; then "$CLAUDE_BIN" --dangerously-skip-permissions "$@"; else "$CLAUDE_BIN" "$@"; fi
+  if [[ "${CLAUDEX_SKIP_PERMISSIONS:-1}" == "1" ]]; then "$CLAUDE_BIN" --dangerously-skip-permissions "$@"; else "$CLAUDE_BIN" "$@"; fi
 }
 run_terra() { claude_command --agent claudex-terra --model "$MODEL" --effort "$EFFORT" --autocompact "$AUTOCOMPACT" "$@"; }
 run_luna() {
   [[ $# -gt 0 ]] || { echo 'Claudex: luna requires a task prompt.' >&2; exit 2; }
-  claude_command --agent claudex-luna --model "$LUNA_MODEL" --effort medium --permission-mode plan --autocompact "$AUTOCOMPACT" "$@"
+  claude_command --agent claudex-luna --model "$LUNA_MODEL" --effort high --permission-mode plan --autocompact "$AUTOCOMPACT" "$@"
 }
 run_sol() {
   [[ $# -gt 0 ]] || { echo 'Claudex: sol requires a task prompt.' >&2; exit 2; }
-  claude_command --agent claudex-sol --model "$SOL_MODEL" --effort xhigh --permission-mode plan --autocompact "$AUTOCOMPACT" "$@"
+  claude_command --agent claudex-sol --model "$SOL_MODEL" --effort high --permission-mode plan --autocompact "$AUTOCOMPACT" "$@"
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,7 +79,7 @@ run_sol_review() {
   review_file="$(mktemp "$STATE_HOME/tmp/sol-review.XXXXXX.json")"
   trap 'rm -f "$review_file"' EXIT
   prompt='Review the current staged Git diff. Inspect relevant repository context with read-only tools. Return only valid JSON with this exact shape: {"verdict":"PASS|CHANGES_REQUIRED|BLOCKED","summary":"...","findings":[{"severity":"high|medium|low","file":"path or null","line":1,"problem":"...","failure_scenario":"...","required_action":"... or null"}],"uncertainties":["..."]}. Use PASS only when no material correction is required.'
-  claude_command --agent claudex-sol --model "$SOL_MODEL" --effort xhigh --permission-mode plan --autocompact "$AUTOCOMPACT" --print --output-format text "$prompt" >"$review_file"
+  claude_command --agent claudex-sol --model "$SOL_MODEL" --effort high --permission-mode plan --autocompact "$AUTOCOMPACT" --print --output-format text "$prompt" >"$review_file"
   receipt="$("$SCRIPT_DIR/claudex-review-receipt" write "$review_file")"
   verdict="$(python3 - "$receipt" <<'PY'
 import json, sys

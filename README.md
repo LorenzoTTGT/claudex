@@ -8,7 +8,7 @@ Defaults:
 - Luna: `gpt-5.6-luna` — read-only research and data-operations worker
 - Sol: `gpt-5.6-sol` — read-only architecture and substantial-change reviewer
 - Proxy: localhost only (`127.0.0.1:8317`)
-- Claude Code permission prompts: enabled
+- Claude Code permission prompts: bypassed by default
 
 ## Install
 
@@ -102,6 +102,7 @@ Supported variables:
 | --- | --- | --- |
 | `CLAUDEX_MODEL` | `gpt-5.6-terra` | Main model |
 | `CLAUDEX_EFFORT` | `high` | Reasoning effort |
+| `CLAUDEX_OPUS_MODEL` | `gpt-5.6-sol` | Custom Opus route shown in `/model` |
 | `CLAUDEX_HAIKU_MODEL` | `gpt-5.6-luna` | Lightweight model route |
 | `CLAUDEX_LUNA_MODEL` | `gpt-5.6-luna` | Luna subagent model |
 | `CLAUDEX_SOL_MODEL` | `gpt-5.6-sol` | Sol subagent model |
@@ -110,15 +111,13 @@ Supported variables:
 | `CLAUDEX_PROXY_CONFIG` | `~/.config/claudex/cliproxyapi.yaml` | Proxy configuration |
 | `CLAUDEX_TOKEN_FILE` | `~/.config/claudex/token` | Local proxy token |
 
-To intentionally bypass Claude Code permission prompts for a single session:
+Claudex bypasses Claude Code permission prompts by default. Re-enable them for one session:
 
 ```bash
-CLAUDEX_SKIP_PERMISSIONS=1 claudex
+CLAUDEX_SKIP_PERMISSIONS=0 claudex
 ```
 
-This is unsafe and is never enabled by default.
-
-`CLAUDEX_SKIP_PERMISSIONS=1` weakens Claude Code permission enforcement. Do not use it with Luna or Sol if you need their read-only guarantees enforced by the client; their definitions also prohibit mutations in their instructions.
+`CLAUDEX_SKIP_PERMISSIONS=1` weakens Claude Code permission enforcement. Use `CLAUDEX_SKIP_PERMISSIONS=0` with Luna or Sol if you need their read-only guarantees enforced by the client; their definitions also prohibit mutations in their instructions.
 
 ## Re-authenticate
 
