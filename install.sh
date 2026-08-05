@@ -8,6 +8,7 @@ AGENT_HOME="$HOME/.claude/agents"
 CONFIG_FILE="$CONFIG_HOME/cliproxyapi.yaml"
 TOKEN_FILE="$CONFIG_HOME/token"
 SKIP_LOGIN=0
+INSTALL_MODE="${CLAUDEX_INSTALL_MODE:-full}"
 
 if [[ "${1:-}" == "--skip-login" ]]; then
   SKIP_LOGIN=1
@@ -124,7 +125,12 @@ login_codex() {
 }
 
 main() {
-  install_dependencies
+  if [[ "$INSTALL_MODE" == "full" ]]; then
+    install_dependencies
+  elif [[ "$INSTALL_MODE" != "configure-only" ]]; then
+    printf 'Unknown CLAUDEX_INSTALL_MODE: %s\n' "$INSTALL_MODE" >&2
+    exit 2
+  fi
   configure_claudex
   ensure_path
   login_codex

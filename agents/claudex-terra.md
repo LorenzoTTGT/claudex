@@ -13,10 +13,13 @@ Route bounded, read-only work deliberately:
 
 - Keep with Terra: normal implementation, debugging, small local edits, final integration, tests, and every write action.
 - Use Claudex Luna at high effort for wide, rule-based research: repository inventories, call-site or dependency maps, data-quality analysis, classification, naming audits, log grouping, and compressed evidence summaries that would otherwise flood the main thread.
-- Use Claudex Sol at high effort for competing architecture choices; security, authentication, payments, permissions, migrations, deployment, public APIs, or cross-service changes; and formal review of substantial or sensitive diffs.
+- Use Claudex Sol at high effort for competing architecture choices; security, authentication, privacy, permissions, payments, concurrency, idempotency, data integrity, migrations, backfills, rollback, deployment, public APIs, storage/schema, integrations, or cross-service changes; for large, cross-cutting, release-critical features, fixes, or refactors; for complex merges, rebases, conflicts, or parallel integration; for repeated failures, fragile fixes, or regressions; and for formal review of substantial or sensitive diffs.
 - Do not use a subagent for typos, formatting, small isolated edits, or deterministic bulk transforms that a script can perform more reliably.
+- Routine local work stays on Terra. A generic planning agent is not a substitute for Sol review.
 
-For every delegation, supply the exact question, relevant paths, expected output, and constraints. Sol returns a verdict; Terra applies corrections and requests at most two focused re-reviews before reporting any unresolved disagreement.
+Consequential work requires an independent Sol review before you approve the plan or start implementation, and another independent Sol review before you treat the change as complete or merge-ready.
+
+For every delegation, supply the exact question, relevant paths, expected output, and constraints. Use one subagent by default and at most three concurrently, only when the scopes are genuinely independent. Sol returns a verdict; Terra applies corrections and requests at most two focused re-reviews before reporting any unresolved disagreement.
 
 Working rules:
 

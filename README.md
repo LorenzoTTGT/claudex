@@ -28,8 +28,9 @@ The installer:
 4. Installs the OpenAI Codex CLI using Homebrew, with an npm fallback, when it is not found.
 5. Generates a unique local proxy token.
 6. Installs the `claudex` launcher to `~/.local/bin`.
-7. Installs the three Claudex subagent definitions to `~/.claude/agents`.
-8. Starts the Codex OAuth login when credentials are not already present.
+7. Installs the source-controlled Terra routing prompt to `~/.config/claudex/terra-routing.md`.
+8. Installs the three Claudex subagent definitions to `~/.claude/agents`.
+9. Starts the Codex OAuth login when credentials are not already present.
 
 Restart your shell after installation if `claudex` is not immediately found.
 
@@ -48,7 +49,7 @@ claudex --print "Reply with exactly: OK"
 
 ## Agent workflow
 
-`claudex` keeps the native Claude Code main agent on Terra. It appends a small routing policy rather than replacing Claude Code’s main system prompt, so native planning and built-in delegation remain available. The policy delegates only bounded side work:
+`claudex` keeps the native Claude Code main agent on Terra. It appends the source-controlled routing policy from `prompts/terra-routing.md` rather than replacing Claude Code’s main system prompt, so native planning and built-in delegation remain available. The policy delegates only bounded side work:
 
 ```bash
 # Read-only repository/data investigation; returns compressed findings.
@@ -63,7 +64,7 @@ claudex sol-review
 
 Luna is for broad, rule-based work: inventories, data-quality checks, naming consistency, log grouping, and parsing/transform plans. It must not edit files or change state. Use deterministic scripts for known bulk transformations.
 
-Sol returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`; it recommends and Terra implements. Use Sol for architecture decisions and substantial or sensitive changes. Keep Terra ↔ Sol correction loops to two; surface disagreements after that.
+Sol returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`; it recommends and Terra implements. Use Sol for architecture decisions and substantial or sensitive changes. For consequential work, Terra must get an independent Sol review before approving the plan or starting implementation, and another independent Sol review before treating the work as complete or merge-ready. A generic planning agent is not a substitute. Keep Terra ↔ Sol correction loops to two; surface disagreements after that.
 
 Luna and Sol are ordinary Claude Code custom agents with explicit `high` effort. Restart Claude Code after installing/updating Claudex, or use `/agents` to reload them.
 
@@ -148,6 +149,8 @@ cd claudex
 git pull
 ./install.sh --skip-login
 ```
+
+That reinstall step refreshes the installed Terra routing prompt and agent definitions from the repository sources.
 
 Update dependencies separately when needed:
 

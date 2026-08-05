@@ -18,6 +18,63 @@ test -f "$ROOT_DIR/agents/claudex-terra.md"
 test -f "$ROOT_DIR/agents/claudex-luna.md"
 test -f "$ROOT_DIR/agents/claudex-sol.md"
 test -f "$ROOT_DIR/prompts/terra-routing.md"
+grep -Fq 'independent Sol review before Terra approves the plan or starts implementation' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require an independent Sol review before consequential implementation'
+grep -Fq 'another independent Sol review before Terra treats the change as complete or merge-ready' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require an independent Sol review before consequential completion'
+grep -Fq 'at most three concurrently' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must cap concurrent subagents at three'
+grep -Fq 'A generic planning agent is not a substitute for Sol review.' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must reject generic planning as a Sol substitute'
+grep -Fq 'before you approve the plan or start implementation' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must require Sol review before consequential implementation'
+grep -Fq 'before you treat the change as complete or merge-ready' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must require Sol review before consequential completion'
+
+INSTALL_HOME="$TMP_DIR/install-home"
+INSTALL_XDG="$TMP_DIR/install-xdg"
+INSTALL_MOCK_BIN="$TMP_DIR/install-mock-bin"
+mkdir -p "$INSTALL_HOME" "$INSTALL_XDG" "$INSTALL_MOCK_BIN"
+CLAUDE_ARGS_LOG="$TMP_DIR/claude-args.log"
+cat >"$INSTALL_MOCK_BIN/claude" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >"${CLAUDE_ARGS_LOG:?}"
+EOF
+cat >"$INSTALL_MOCK_BIN/cliproxyapi" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+cat >"$INSTALL_MOCK_BIN/curl" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod 755 "$INSTALL_MOCK_BIN/claude" "$INSTALL_MOCK_BIN/cliproxyapi" "$INSTALL_MOCK_BIN/curl"
+env \
+  HOME="$INSTALL_HOME" \
+  XDG_CONFIG_HOME="$INSTALL_XDG" \
+  PATH="$INSTALL_MOCK_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  CLAUDEX_INSTALL_MODE=configure-only \
+  "$ROOT_DIR/install.sh" --skip-login >/dev/null
+INSTALLED_PROMPT="$INSTALL_XDG/claudex/terra-routing.md"
+cmp -s "$ROOT_DIR/prompts/terra-routing.md" "$INSTALLED_PROMPT" || fail 'install.sh must install the current routing prompt'
+printf '%s\n' 'stale prompt' >"$INSTALLED_PROMPT"
+env \
+  HOME="$INSTALL_HOME" \
+  XDG_CONFIG_HOME="$INSTALL_XDG" \
+  PATH="$INSTALL_MOCK_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  CLAUDEX_INSTALL_MODE=configure-only \
+  "$ROOT_DIR/install.sh" --skip-login >/dev/null
+cmp -s "$ROOT_DIR/prompts/terra-routing.md" "$INSTALLED_PROMPT" || fail 'install.sh must refresh the installed routing prompt on reinstall'
+printf '%s\n' 'sentinel routing prompt from installed file' >"$INSTALLED_PROMPT"
+rm -f "$CLAUDE_ARGS_LOG"
+env \
+  HOME="$INSTALL_HOME" \
+  XDG_CONFIG_HOME="$INSTALL_XDG" \
+  PATH="$INSTALL_MOCK_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  CLAUDEX_PROXY_CONFIG="$INSTALL_XDG/claudex/cliproxyapi.yaml" \
+  CLAUDEX_TOKEN_FILE="$INSTALL_XDG/claudex/token" \
+  CLAUDEX_SKIP_PERMISSIONS=0 \
+  CLAUDE_ARGS_LOG="$CLAUDE_ARGS_LOG" \
+  "$INSTALL_HOME/.local/bin/claudex" --print 'Reply with exactly: OK' >/dev/null
+grep -Fq -- '--append-system-prompt' "$CLAUDE_ARGS_LOG" || fail 'installed launcher must append the installed routing prompt'
+grep -Fq 'sentinel routing prompt from installed file' "$CLAUDE_ARGS_LOG" || fail 'installed launcher must consume the installed routing prompt file'
 
 REPO="$TMP_DIR/repo"
 mkdir -p "$REPO"
