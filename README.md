@@ -106,7 +106,7 @@ Supported variables:
 | `CLAUDEX_HAIKU_MODEL` | `gpt-5.6-luna` | Lightweight model route |
 | `CLAUDEX_LUNA_MODEL` | `gpt-5.6-luna` | Luna subagent model |
 | `CLAUDEX_SOL_MODEL` | `gpt-5.6-sol` | Sol subagent model |
-| `CLAUDEX_AUTOCOMPACT` | `auto` | Claude Code compaction threshold (`auto` or a supported token value) |
+| `CLAUDEX_AUTOCOMPACT` | `220k` | Claude Code compaction threshold (`auto` or a supported token value) |
 | `CLAUDEX_BASE_URL` | `http://127.0.0.1:8317` | Local proxy URL |
 | `CLAUDEX_PROXY_CONFIG` | `~/.config/claudex/cliproxyapi.yaml` | Proxy configuration |
 | `CLAUDEX_TOKEN_FILE` | `~/.config/claudex/token` | Local proxy token |
