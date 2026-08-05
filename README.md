@@ -78,13 +78,26 @@ claudex install-hook
 
 The hook never calls a model. It deterministically requires a matching `PASS` receipt only when the staged diff is sensitive (auth, permissions, payments, migrations, deployment, dependency manifests) or substantial (20+ files, 800+ changed lines, or three+ top-level areas).
 
+For those substantial or sensitive changes, `claudex sol-review` also requires deterministic verification-command evidence for the exact staged tree. Sol reviews an isolated checkout of that tree; the commands and their policy file also come from the staged tree and run in a separate detached worktree. Unstaged or untracked files therefore cannot influence either review or verification. Configure one command per line in `.claudex/verify-commands` and commit that policy with the project:
+
+```bash
+mkdir -p .claudex
+cat > .claudex/verify-commands <<'EOF'
+npm run lint
+npm test
+EOF
+git add .claudex/verify-commands
+```
+
 ```bash
 git add -A
-claudex sol-review    # creates a receipt bound to this exact staged tree
-git commit -m "..."  # allowed only if that receipt says PASS
+claudex sol-review    # creates a receipt bound to this exact staged tree, with Sol PASS + verification evidence
+git commit -m "..."  # allowed only if that receipt says PASS and the verification commands passed
 ```
 
 Any staged change changes the tree hash and makes the receipt stale. Receipts are stored locally in `${XDG_STATE_HOME:-~/.local/state}/claudex/reviews`; they are not committed. Check a gate manually with `claudex review-gate`.
+
+This is a local workflow guardrail, not a security boundary against someone who controls the repository and machine: Git hooks can be bypassed or modified. Its purpose is to prevent accidental commits without matching review and verification evidence.
 
 CLIProxyAPI starts automatically on the first launch and remains local to the computer.
 

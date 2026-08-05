@@ -2,8 +2,6 @@
 set -euo pipefail
 
 # Claudex-managed pre-commit hook
-# asset-version: __CLAUDEX_ASSET_VERSION__
+CLAUDEX_GATE_BIN="__CLAUDEX_GATE_BIN__"
 
-CLAUDEX_BIN="__CLAUDEX_BIN__"
-
-exec "$CLAUDEX_BIN" gate check --hook
+exec "$CLAUDEX_GATE_BIN" check

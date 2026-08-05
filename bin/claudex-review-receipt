@@ -6,11 +6,11 @@ RECEIPT_DIR="$STATE_HOME/reviews"
 
 usage() {
   cat <<'EOF'
-Usage: claudex-review-receipt <write|check|classify> [review-file]
+Usage: claudex-review-receipt <check|classify|verify> [arguments]
 
-write <review-file>  Validate a Sol JSON receipt and bind it to the current staged tree.
 check                Require a matching PASS receipt only for substantial/sensitive staged changes.
 classify             Print whether the current staged change requires review.
+verify <output-file> Run configured verification commands for the current staged tree and write evidence JSON.
 EOF
 }
 
@@ -21,7 +21,7 @@ classification() {
   local files lines roots
   files="$(git diff --cached --name-only)"
   [[ -n "$files" ]] || { echo "none"; return; }
-  if printf '%s\n' "$files" | grep -Eiq '(^|/)(auth|authentication|authorization|permissions?|payments?|billing|migrations?|schema|deploy|deployment|infra|terraform|k8s|docker|\.github/workflows)(/|$)|(^|/)(package\.json|pnpm-lock|package-lock|yarn\.lock|go\.mod|Cargo\.toml)$'; then
+  if printf '%s\n' "$files" | grep -Eiq '(^|/)(auth|authentication|authorization|permissions?|payments?|billing|migrations?|schema|deploy|deployment|infra|terraform|k8s|docker|\.github/workflows)(/|$)|(^|/)(package\.json|pnpm-lock|package-lock|yarn\.lock|go\.mod|Cargo\.toml)$|^\.claudex/verify-commands$'; then
     echo "sensitive"; return
   fi
   if git diff --cached --numstat | awk '{a+=$1; d+=$2} END {exit !(a+d >= 800)}'; then
@@ -36,18 +36,178 @@ classification() {
   echo "small"
 }
 
+verification_commands_source() {
+  local destination="${1:-}"
+  [[ -n "$destination" ]] || return 2
+  if git show ":.claudex/verify-commands" >"$destination" 2>/dev/null; then
+    printf '%s\n' '.claudex/verify-commands@staged-tree'
+  else
+    : >"$destination"
+  fi
+}
+
+verification_cleanup() {
+  if [[ -n "${worktree_dir:-}" && -d "$worktree_dir" ]]; then
+    git worktree remove --force "$worktree_dir" >/dev/null 2>&1 || rm -rf -- "$worktree_dir"
+  fi
+  [[ -z "${commands_file:-}" ]] || rm -f -- "$commands_file"
+}
+
+run_verification() {
+  local output_file="${1:-}" expected_tree="${2:-}" class tree current_tree commands_file commands_source worktree_dir worktree_commit parent_commit status
+  [[ -n "$output_file" ]] || { usage >&2; exit 2; }
+  command -v python3 >/dev/null 2>&1 || { echo 'Claudex review gate requires python3 to run verification commands.' >&2; exit 2; }
+
+  class="$(classification)"
+  tree="$(tree_hash)" || return 2
+  if [[ -n "$expected_tree" && "$tree" != "$expected_tree" ]]; then
+    echo "Claudex review gate: staged tree changed before verification; run claudex sol-review again." >&2
+    return 1
+  fi
+  commands_file="$(mktemp "${TMPDIR:-/tmp}/claudex-verify-commands.XXXXXX")" || return 2
+  worktree_dir=""
+  trap verification_cleanup EXIT
+  commands_source="$(verification_commands_source "$commands_file")" || {
+    status=$?
+    verification_cleanup
+    trap - EXIT
+    return "$status"
+  }
+  worktree_dir="$(mktemp -d "${TMPDIR:-/tmp}/claudex-verify-worktree.XXXXXX")" || {
+    status=$?
+    verification_cleanup
+    trap - EXIT
+    return "$status"
+  }
+  if parent_commit="$(git rev-parse --verify HEAD 2>/dev/null)"; then
+    worktree_commit="$(printf 'Claudex verification snapshot\n' | git commit-tree "$tree" -p "$parent_commit")" || {
+      status=$?
+      verification_cleanup
+      trap - EXIT
+      return "$status"
+    }
+  else
+    worktree_commit="$(printf 'Claudex verification snapshot\n' | git commit-tree "$tree")" || {
+      status=$?
+      verification_cleanup
+      trap - EXIT
+      return "$status"
+    }
+  fi
+  git worktree add --detach --quiet "$worktree_dir" "$worktree_commit" >/dev/null || {
+    status=$?
+    verification_cleanup
+    trap - EXIT
+    return "$status"
+  }
+
+  status=0
+  python3 - "$commands_file" "$output_file" "$worktree_dir" "$tree" "$class" "$commands_source" <<'PY' || status=$?
+import hashlib, json, pathlib, subprocess, sys, time
+
+commands_path, output_path, worktree_dir, tree, classification, source = sys.argv[1:]
+
+def tail(text: str, limit: int = 20, max_chars: int = 4000) -> str:
+    lines = text.strip().splitlines()
+    value = "\n".join(lines[-limit:]) if lines else ""
+    return value[-max_chars:]
+
+def digest(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+commands = []
+for raw in pathlib.Path(commands_path).read_text().splitlines():
+    stripped = raw.strip()
+    if stripped and not stripped.startswith("#"):
+        commands.append(stripped)
+
+required = classification in {"sensitive", "substantial"}
+if required and not commands:
+    raise SystemExit(
+        "Claudex review gate: substantial/sensitive staged changes require configured verification commands. "
+        "Create and stage .claudex/verify-commands."
+    )
+
+results = []
+all_passed = True
+for command in commands:
+    started = time.time()
+    completed = subprocess.run(
+        ["bash", "-c", command],
+        cwd=worktree_dir,
+        text=True,
+        capture_output=True,
+    )
+    duration_ms = int((time.time() - started) * 1000)
+    passed = completed.returncode == 0
+    all_passed = all_passed and passed
+    results.append(
+        {
+            "command": command,
+            "exit_code": completed.returncode,
+            "status": "passed" if passed else "failed",
+            "duration_ms": duration_ms,
+            "stdout_sha256": digest(completed.stdout),
+            "stderr_sha256": digest(completed.stderr),
+            "stdout_tail": tail(completed.stdout),
+            "stderr_tail": tail(completed.stderr),
+        }
+    )
+
+payload = {
+    "format": 1,
+    "staged_tree": tree,
+    "classification": classification,
+    "required": required,
+    "commands_source": source or None,
+    "policy_sha256": hashlib.sha256(pathlib.Path(commands_path).read_bytes()).hexdigest(),
+    "all_passed": all_passed,
+    "commands": results,
+    "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+}
+pathlib.Path(output_path).write_text(json.dumps(payload, indent=2) + "\n")
+if required and not all_passed:
+    raise SystemExit("Claudex review gate: verification commands failed; receipt was not approved.")
+PY
+
+  current_tree="$(tree_hash)" || status=2
+  if [[ "$current_tree" != "$tree" ]]; then
+    echo "Claudex review gate: staged tree changed during verification; evidence was discarded." >&2
+    rm -f -- "$output_file"
+    status=1
+  fi
+
+  verification_cleanup
+  worktree_dir=""
+  commands_file=""
+  trap - EXIT
+  return "$status"
+}
+
 write_receipt() {
-  local review_file="${1:-}" tree destination
-  [[ -n "$review_file" && -r "$review_file" ]] || { usage >&2; exit 2; }
+  local review_file="${1:-}" expected_tree="${2:-}" verification_file tree class destination status
+  [[ -n "$review_file" && -r "$review_file" && -n "$expected_tree" ]] || { usage >&2; exit 2; }
   command -v python3 >/dev/null 2>&1 || { echo 'Claudex review gate requires python3 to validate review JSON.' >&2; exit 2; }
   tree="$(tree_hash)"
+  [[ "$tree" == "$expected_tree" ]] || { echo 'Claudex review gate: staged tree changed after Sol review; run claudex sol-review again.' >&2; return 1; }
+  class="$(classification)"
   mkdir -p "$RECEIPT_DIR"
   destination="$RECEIPT_DIR/$tree.json"
-  python3 - "$review_file" "$destination" "$tree" <<'PY'
+  verification_file="$(mktemp "${TMPDIR:-/tmp}/claudex-verification-evidence.XXXXXX.json")"
+  status=0
+  run_verification "$verification_file" "$expected_tree" || status=$?
+  if [[ "$status" -ne 0 ]]; then
+    rm -f -- "$verification_file"
+    return "$status"
+  fi
+  tree="$(tree_hash)"
+  [[ "$tree" == "$expected_tree" ]] || { rm -f -- "$verification_file"; echo 'Claudex review gate: staged tree changed before receipt creation; run claudex sol-review again.' >&2; return 1; }
+  status=0
+  python3 - "$review_file" "$verification_file" "$destination" "$tree" "$class" <<'PY' || status=$?
 import json, pathlib, sys, time
-source, destination, tree = sys.argv[1:]
+review_source, verification_source, destination, tree, classification = sys.argv[1:]
 try:
-    value = json.load(open(source))
+    value = json.load(open(review_source))
 except Exception as error:
     raise SystemExit(f"Invalid Sol review JSON: {error}")
 if value.get("verdict") not in {"PASS", "CHANGES_REQUIRED", "BLOCKED"}:
@@ -57,32 +217,103 @@ if not isinstance(value.get("findings", []), list):
 for finding in value["findings"]:
     if not isinstance(finding, dict) or not all(key in finding for key in ("severity", "problem", "required_action")):
         raise SystemExit("Invalid Sol review JSON: every finding needs severity, problem, and required_action")
-value.update({"staged_tree": tree, "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "format": 1})
+
+try:
+    verification = json.load(open(verification_source))
+except Exception as error:
+    raise SystemExit(f"Invalid verification JSON: {error}")
+if verification.get("format") != 1:
+    raise SystemExit("Invalid verification JSON: format must be 1")
+if verification.get("staged_tree") != tree:
+    raise SystemExit("Invalid verification JSON: staged_tree does not match the current staged tree")
+if verification.get("classification") != classification:
+    raise SystemExit("Invalid verification JSON: classification does not match the current staged change")
+required = classification in {"sensitive", "substantial"}
+if verification.get("required") is not required:
+    raise SystemExit("Invalid verification JSON: required flag does not match the current staged change")
+commands = verification.get("commands")
+if not isinstance(commands, list):
+    raise SystemExit("Invalid verification JSON: commands must be a list")
+if required and not commands:
+    raise SystemExit("Invalid verification JSON: required verification must include at least one command result")
+command_passes = []
+for result in commands:
+    if not isinstance(result, dict) or not all(key in result for key in ("command", "exit_code", "status")):
+        raise SystemExit("Invalid verification JSON: every command result needs command, exit_code, and status")
+    if not isinstance(result["command"], str) or not result["command"].strip():
+        raise SystemExit("Invalid verification JSON: command must be a non-empty string")
+    if not isinstance(result["exit_code"], int) or result["status"] not in {"passed", "failed"}:
+        raise SystemExit("Invalid verification JSON: command result has an invalid exit_code or status")
+    passed = result["exit_code"] == 0 and result["status"] == "passed"
+    if (result["exit_code"] == 0) != (result["status"] == "passed"):
+        raise SystemExit("Invalid verification JSON: command exit_code and status disagree")
+    command_passes.append(passed)
+expected_all_passed = all(command_passes)
+if verification.get("all_passed") is not expected_all_passed:
+    raise SystemExit("Invalid verification JSON: all_passed disagrees with command results")
+if required and not expected_all_passed:
+    raise SystemExit("Invalid verification JSON: required verification commands did not all pass")
+
+value.update(
+    {
+        "staged_tree": tree,
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "format": 2,
+        "verification": verification,
+    }
+)
 pathlib.Path(destination).write_text(json.dumps(value, indent=2) + "\n")
 PY
+  rm -f -- "$verification_file"
+  [[ "$status" -eq 0 ]] || return "$status"
   echo "$destination"
 }
 
 check_receipt() {
-  local class tree receipt verdict
+  local class tree receipt status
   class="$(classification)"
   [[ "$class" == "none" || "$class" == "small" ]] && { echo "Claudex review gate: $class staged change; no Sol receipt required."; return; }
   tree="$(tree_hash)"; receipt="$RECEIPT_DIR/$tree.json"
   [[ -r "$receipt" ]] || { echo "Claudex review gate: $class staged change requires a matching Sol PASS receipt. Run: claudex sol-review" >&2; exit 1; }
-  verdict="$(python3 - "$receipt" "$tree" <<'PY'
+  status="$(python3 - "$receipt" "$tree" <<'PY'
 import json, sys
 v=json.load(open(sys.argv[1]))
-if v.get('format') == 1 and v.get('staged_tree') == sys.argv[2]: print(v.get('verdict',''))
+if v.get('format') != 2 or v.get('staged_tree') != sys.argv[2]:
+    print('invalid')
+    raise SystemExit
+verification = v.get('verification') or {}
+required = verification.get('required') is True
+commands = verification.get('commands') or []
+all_passed = verification.get('all_passed') is True
+verdict = v.get('verdict', '')
+if verdict == 'PASS' and required and commands and all_passed:
+    print('pass')
+else:
+    print(f"{verdict or 'invalid'}:{'verification_failed' if required and (not commands or not all_passed) else 'invalid'}")
 PY
 )"
-  [[ "$verdict" == "PASS" ]] || { echo "Claudex review gate: matching Sol receipt verdict is ${verdict:-invalid}, not PASS." >&2; exit 1; }
-  echo "Claudex review gate: matching Sol PASS receipt found."
+  [[ "$status" == "pass" ]] || {
+    case "$status" in
+      CHANGES_REQUIRED:*|BLOCKED:*)
+        echo "Claudex review gate: matching Sol receipt verdict is ${status%%:*}, not PASS." >&2
+        ;;
+      PASS:verification_failed)
+        echo "Claudex review gate: matching Sol PASS receipt is missing successful verification evidence for this staged tree." >&2
+        ;;
+      *)
+        echo "Claudex review gate: matching receipt is invalid or stale for this staged tree." >&2
+        ;;
+    esac
+    exit 1
+  }
+  echo "Claudex review gate: matching Sol PASS receipt and verification evidence found."
 }
 
 require_git_repo
 case "${1:-}" in
-  write) write_receipt "${2:-}" ;;
-  check) check_receipt ;;
-  classify) classification ;;
+  _finalize) [[ $# -eq 3 ]] || { usage >&2; exit 2; }; write_receipt "$2" "$3" ;;
+  check) [[ $# -eq 1 ]] || { usage >&2; exit 2; }; check_receipt ;;
+  classify) [[ $# -eq 1 ]] || { usage >&2; exit 2; }; classification ;;
+  verify) [[ $# -eq 2 ]] || { usage >&2; exit 2; }; run_verification "$2" ;;
   *) usage >&2; exit 2 ;;
 esac

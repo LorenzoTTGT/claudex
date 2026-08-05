@@ -76,29 +76,80 @@ run_sol() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+sol_review_cleanup() {
+  local worktree_dir="${1:-}" review_path="${2:-}" diff_path="${3:-}"
+  if [[ -n "$worktree_dir" && -d "$worktree_dir" ]]; then
+    git worktree remove --force "$worktree_dir" >/dev/null 2>&1 || rm -rf -- "$worktree_dir"
+  fi
+  [[ -z "$review_path" ]] || rm -f -- "$review_path"
+  [[ -z "$diff_path" ]] || rm -f -- "$diff_path"
+}
+
 run_sol_review() {
   git rev-parse --git-dir >/dev/null 2>&1 || { echo 'Claudex: sol-review must run in a Git repository.' >&2; exit 2; }
-  local review_file prompt receipt verdict
+  local review_file staged_diff_file staged_tree review_worktree_dir review_commit parent_commit current_tree prompt receipt verdict cleanup_command
   mkdir -p "$STATE_HOME/tmp"
   review_file="$(mktemp "$STATE_HOME/tmp/sol-review.XXXXXX.json")"
-  trap 'rm -f "$review_file"' EXIT
-  prompt='Review the current staged Git diff. Inspect relevant repository context with read-only tools. Return only valid JSON with this exact shape: {"verdict":"PASS|CHANGES_REQUIRED|BLOCKED","summary":"...","findings":[{"severity":"high|medium|low","file":"path or null","line":1,"problem":"...","failure_scenario":"...","required_action":"... or null"}],"uncertainties":["..."]}. Use PASS only when no material correction is required.'
-  claude_command --agent claudex-sol --model "$SOL_MODEL" --effort high --permission-mode plan --autocompact "$AUTOCOMPACT" --print --output-format text "$prompt" >"$review_file"
-  receipt="$("$SCRIPT_DIR/claudex-review-receipt" write "$review_file")"
-  verdict="$(python3 - "$receipt" <<'PY'
+  staged_diff_file="$(mktemp "$STATE_HOME/tmp/sol-staged-diff.XXXXXX.patch")"
+  review_worktree_dir=""
+  printf -v cleanup_command 'sol_review_cleanup %q %q %q' "$review_worktree_dir" "$review_file" "$staged_diff_file"
+  trap "$cleanup_command" EXIT
+  staged_tree="$(git write-tree)"
+  git diff --cached --no-ext-diff --no-textconv >"$staged_diff_file"
+  review_worktree_dir="$(mktemp -d "${TMPDIR:-/tmp}/claudex-sol-review.XXXXXX")"
+  printf -v cleanup_command 'sol_review_cleanup %q %q %q' "$review_worktree_dir" "$review_file" "$staged_diff_file"
+  trap "$cleanup_command" EXIT
+  if parent_commit="$(git rev-parse --verify HEAD 2>/dev/null)"; then
+    review_commit="$(printf 'Claudex Sol review snapshot\n' | git commit-tree "$staged_tree" -p "$parent_commit")"
+  else
+    review_commit="$(printf 'Claudex Sol review snapshot\n' | git commit-tree "$staged_tree")"
+  fi
+  git worktree add --detach --quiet "$review_worktree_dir" "$review_commit" >/dev/null
+  prompt="Review only the exact staged Git diff stored at $staged_diff_file for staged tree $staged_tree. Read that patch first, then inspect relevant repository files with read-only tools. Ignore unstaged and untracked changes. Return only valid JSON with this exact shape: {\"verdict\":\"PASS|CHANGES_REQUIRED|BLOCKED\",\"summary\":\"...\",\"findings\":[{\"severity\":\"high|medium|low\",\"file\":\"path or null\",\"line\":1,\"problem\":\"...\",\"failure_scenario\":\"...\",\"required_action\":\"... or null\"}],\"uncertainties\":[\"...\"]}. Use PASS only when no material correction is required."
+  (cd "$review_worktree_dir" && claude_command --agent claudex-sol --model "$SOL_MODEL" --effort high --permission-mode plan --autocompact "$AUTOCOMPACT" --print --output-format text "$prompt") >"$review_file"
+  current_tree="$(git write-tree)"
+  if [[ "$current_tree" != "$staged_tree" ]]; then
+    echo 'Claudex: staged tree changed while Sol was reviewing; no receipt was saved. Run claudex sol-review again.' >&2
+    sol_review_cleanup "$review_worktree_dir" "$review_file" "$staged_diff_file"
+    trap - EXIT
+    return 1
+  fi
+  verdict="$(python3 - "$review_file" <<'PY'
 import json, sys
-print(json.load(open(sys.argv[1]))['verdict'])
+print(json.load(open(sys.argv[1])).get('verdict', ''))
 PY
 )"
-  [[ "$verdict" == "PASS" ]] || { echo "Claudex: Sol review verdict is $verdict; receipt saved, but the review gate remains blocked." >&2; return 1; }
-  echo 'Claudex: Sol PASS receipt saved for the current staged tree.'
+  if [[ "$verdict" != "PASS" ]]; then
+    echo "Claudex: Sol review verdict is ${verdict:-invalid}; no approval receipt was saved." >&2
+    sol_review_cleanup "$review_worktree_dir" "$review_file" "$staged_diff_file"
+    trap - EXIT
+    return 1
+  fi
+  receipt="$("$SCRIPT_DIR/claudex-review-receipt" _finalize "$review_file" "$staged_tree")"
+  if [[ ! -r "$receipt" ]]; then
+    echo 'Claudex: verification completed but no receipt was created.' >&2
+    sol_review_cleanup "$review_worktree_dir" "$review_file" "$staged_diff_file"
+    trap - EXIT
+    return 1
+  fi
+  sol_review_cleanup "$review_worktree_dir" "$review_file" "$staged_diff_file"
+  trap - EXIT
+  echo 'Claudex: Sol PASS receipt with staged verification evidence saved for the current staged tree.'
 }
 install_hook() {
-  local hook_dir
+  local hook_dir hook_file
   hook_dir="$(git rev-parse --git-path hooks)" || { echo 'Claudex: install-hook must run in a Git repository.' >&2; exit 2; }
   mkdir -p "$hook_dir"
-  install -m 755 "$SCRIPT_DIR/../hooks/pre-commit" "$hook_dir/pre-commit"
-  echo "Claudex: installed review gate at $hook_dir/pre-commit"
+  hook_file="$hook_dir/pre-commit"
+  python3 - "$SCRIPT_DIR/../hooks/pre-commit" "$hook_file" "$SCRIPT_DIR/claudex-review-receipt" <<'PY'
+import pathlib, sys
+
+template, destination, gate = sys.argv[1:]
+content = pathlib.Path(template).read_text().replace("__CLAUDEX_GATE_BIN__", gate)
+pathlib.Path(destination).write_text(content)
+PY
+  chmod 755 "$hook_file"
+  echo "Claudex: installed review gate at $hook_file"
 }
 
 case "${1:-}" in
