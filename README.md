@@ -48,7 +48,7 @@ claudex --print "Reply with exactly: OK"
 
 ## Agent workflow
 
-`claudex` always starts Terra. Terra keeps the main task context and implements normal changes; it should delegate only bounded side work:
+`claudex` keeps the native Claude Code main agent on Terra. It appends a small routing policy rather than replacing Claude Code’s main system prompt, so native planning and built-in delegation remain available. The policy delegates only bounded side work:
 
 ```bash
 # Read-only repository/data investigation; returns compressed findings.
@@ -65,7 +65,7 @@ Luna is for broad, rule-based work: inventories, data-quality checks, naming con
 
 Sol returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`; it recommends and Terra implements. Use Sol for architecture decisions and substantial or sensitive changes. Keep Terra ↔ Sol correction loops to two; surface disagreements after that.
 
-The definitions are ordinary Claude Code custom agents. Restart Claude Code after installing/updating Claudex, or use `/agents` to reload them.
+Luna and Sol are ordinary Claude Code custom agents with explicit `high` effort. Restart Claude Code after installing/updating Claudex, or use `/agents` to reload them.
 
 ## Review receipt gate
 
@@ -107,6 +107,7 @@ Supported variables:
 | `CLAUDEX_LUNA_MODEL` | `gpt-5.6-luna` | Luna subagent model |
 | `CLAUDEX_SOL_MODEL` | `gpt-5.6-sol` | Sol subagent model |
 | `CLAUDEX_AUTOCOMPACT` | `220k` | Claude Code compaction threshold (`auto` or a supported token value) |
+| `CLAUDEX_TERRA_PROMPT_FILE` | `~/.config/claudex/terra-routing.md` | Appended native-agent routing policy |
 | `CLAUDEX_BASE_URL` | `http://127.0.0.1:8317` | Local proxy URL |
 | `CLAUDEX_PROXY_CONFIG` | `~/.config/claudex/cliproxyapi.yaml` | Proxy configuration |
 | `CLAUDEX_TOKEN_FILE` | `~/.config/claudex/token` | Local proxy token |

@@ -79,6 +79,7 @@ configure_claudex() {
 
   install -m 755 "$ROOT_DIR/bin/claudex" "$BIN_HOME/claudex"
   install -m 755 "$ROOT_DIR/bin/claudex-review-receipt" "$BIN_HOME/claudex-review-receipt"
+  install -m 644 "$ROOT_DIR/prompts/terra-routing.md" "$CONFIG_HOME/terra-routing.md"
   install -m 644 "$ROOT_DIR/agents/claudex-terra.md" "$AGENT_HOME/claudex-terra.md"
   install -m 644 "$ROOT_DIR/agents/claudex-luna.md" "$AGENT_HOME/claudex-luna.md"
   install -m 644 "$ROOT_DIR/agents/claudex-sol.md" "$AGENT_HOME/claudex-sol.md"

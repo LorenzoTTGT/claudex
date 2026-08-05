@@ -2,6 +2,7 @@
 name: claudex-luna
 description: Read-only Claudex research and data-operations specialist. Use proactively for bounded investigations, inventories, classification, and evidence gathering that should return compressed structured findings.
 model: gpt-5.6-luna
+effort: high
 permissionMode: plan
 tools: Read, Grep, Glob
 ---

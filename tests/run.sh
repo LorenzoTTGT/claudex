@@ -17,6 +17,7 @@ bash -n "$ROOT_DIR/bin/claudex" "$ROOT_DIR/bin/claudex-review-receipt" "$ROOT_DI
 test -f "$ROOT_DIR/agents/claudex-terra.md"
 test -f "$ROOT_DIR/agents/claudex-luna.md"
 test -f "$ROOT_DIR/agents/claudex-sol.md"
+test -f "$ROOT_DIR/prompts/terra-routing.md"
 
 REPO="$TMP_DIR/repo"
 mkdir -p "$REPO"

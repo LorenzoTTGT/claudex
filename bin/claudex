@@ -11,6 +11,7 @@ AUTOCOMPACT="${CLAUDEX_AUTOCOMPACT:-220k}"
 LUNA_MODEL="${CLAUDEX_LUNA_MODEL:-gpt-5.6-luna}"
 SOL_MODEL="${CLAUDEX_SOL_MODEL:-gpt-5.6-sol}"
 STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/claudex"
+TERRA_PROMPT_FILE="${CLAUDEX_TERRA_PROMPT_FILE:-$CONFIG_HOME/terra-routing.md}"
 LOG_FILE="$CONFIG_HOME/cliproxyapi.log"
 
 usage() {
@@ -61,7 +62,10 @@ export ANTHROPIC_DEFAULT_HAIKU_MODEL="${CLAUDEX_HAIKU_MODEL:-gpt-5.6-luna}"
 claude_command() {
   if [[ "${CLAUDEX_SKIP_PERMISSIONS:-1}" == "1" ]]; then "$CLAUDE_BIN" --dangerously-skip-permissions "$@"; else "$CLAUDE_BIN" "$@"; fi
 }
-run_terra() { claude_command --agent claudex-terra --model "$MODEL" --effort "$EFFORT" --autocompact "$AUTOCOMPACT" "$@"; }
+run_terra() {
+  [[ -r "$TERRA_PROMPT_FILE" ]] || { echo "Claudex: routing prompt is missing at $TERRA_PROMPT_FILE. Run the Claudex installer again." >&2; exit 1; }
+  claude_command --append-system-prompt "$(<"$TERRA_PROMPT_FILE")" --model "$MODEL" --effort "$EFFORT" --autocompact "$AUTOCOMPACT" "$@"
+}
 run_luna() {
   [[ $# -gt 0 ]] || { echo 'Claudex: luna requires a task prompt.' >&2; exit 2; }
   claude_command --agent claudex-luna --model "$LUNA_MODEL" --effort high --permission-mode plan --autocompact "$AUTOCOMPACT" "$@"

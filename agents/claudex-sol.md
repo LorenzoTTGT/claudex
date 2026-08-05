@@ -2,6 +2,7 @@
 name: claudex-sol
 description: Read-only Claudex architecture and review specialist. Use proactively for architecture review, security-sensitive analysis, and formal PASS or CHANGES_REQUIRED or BLOCKED verdicts with prioritized actionable findings.
 model: gpt-5.6-sol
+effort: high
 permissionMode: plan
 tools: Read, Grep, Glob
 ---
