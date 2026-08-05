@@ -4,9 +4,9 @@ Claudex launches **Claude Code** through a local [CLIProxyAPI](https://github.co
 
 Defaults:
 
-- Model: `gpt-5.6-terra`
-- Effort: `high`
-- Lightweight/default Haiku route: `gpt-5.6-luna`
+- Terra: `gpt-5.6-terra` / high — permanent coordinator and implementer
+- Luna: `gpt-5.6-luna` — read-only research and data-operations worker
+- Sol: `gpt-5.6-sol` — read-only architecture and substantial-change reviewer
 - Proxy: localhost only (`127.0.0.1:8317`)
 - Claude Code permission prompts: enabled
 
@@ -28,7 +28,8 @@ The installer:
 4. Installs the OpenAI Codex CLI using Homebrew, with an npm fallback, when it is not found.
 5. Generates a unique local proxy token.
 6. Installs the `claudex` launcher to `~/.local/bin`.
-7. Starts the Codex OAuth login when credentials are not already present.
+7. Installs the three Claudex subagent definitions to `~/.claude/agents`.
+8. Starts the Codex OAuth login when credentials are not already present.
 
 Restart your shell after installation if `claudex` is not immediately found.
 
@@ -44,6 +45,46 @@ Arguments are passed directly to Claude Code:
 claudex --resume
 claudex --print "Reply with exactly: OK"
 ```
+
+## Agent workflow
+
+`claudex` always starts Terra. Terra keeps the main task context and implements normal changes; it should delegate only bounded side work:
+
+```bash
+# Read-only repository/data investigation; returns compressed findings.
+claudex luna "Inventory the request-validation paths and tests."
+
+# Read-only architecture analysis.
+claudex sol "Compare the migration strategies for this schema change."
+
+# Read-only review of the current staged diff. A valid PASS creates a receipt.
+claudex sol-review
+```
+
+Luna is for broad, rule-based work: inventories, data-quality checks, naming consistency, log grouping, and parsing/transform plans. It must not edit files or change state. Use deterministic scripts for known bulk transformations.
+
+Sol returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`; it recommends and Terra implements. Use Sol for architecture decisions and substantial or sensitive changes. Keep Terra ↔ Sol correction loops to two; surface disagreements after that.
+
+The definitions are ordinary Claude Code custom agents. Restart Claude Code after installing/updating Claudex, or use `/agents` to reload them.
+
+## Review receipt gate
+
+Install the gate in a repository when you want sensitive/substantial commits to require a Sol review:
+
+```bash
+cd your-repository
+claudex install-hook
+```
+
+The hook never calls a model. It deterministically requires a matching `PASS` receipt only when the staged diff is sensitive (auth, permissions, payments, migrations, deployment, dependency manifests) or substantial (20+ files, 800+ changed lines, or three+ top-level areas).
+
+```bash
+git add -A
+claudex sol-review    # creates a receipt bound to this exact staged tree
+git commit -m "..."  # allowed only if that receipt says PASS
+```
+
+Any staged change changes the tree hash and makes the receipt stale. Receipts are stored locally in `${XDG_STATE_HOME:-~/.local/state}/claudex/reviews`; they are not committed. Check a gate manually with `claudex review-gate`.
 
 CLIProxyAPI starts automatically on the first launch and remains local to the computer.
 
@@ -62,6 +103,9 @@ Supported variables:
 | `CLAUDEX_MODEL` | `gpt-5.6-terra` | Main model |
 | `CLAUDEX_EFFORT` | `high` | Reasoning effort |
 | `CLAUDEX_HAIKU_MODEL` | `gpt-5.6-luna` | Lightweight model route |
+| `CLAUDEX_LUNA_MODEL` | `gpt-5.6-luna` | Luna subagent model |
+| `CLAUDEX_SOL_MODEL` | `gpt-5.6-sol` | Sol subagent model |
+| `CLAUDEX_AUTOCOMPACT` | `auto` | Claude Code compaction threshold (`auto` or a supported token value) |
 | `CLAUDEX_BASE_URL` | `http://127.0.0.1:8317` | Local proxy URL |
 | `CLAUDEX_PROXY_CONFIG` | `~/.config/claudex/cliproxyapi.yaml` | Proxy configuration |
 | `CLAUDEX_TOKEN_FILE` | `~/.config/claudex/token` | Local proxy token |
@@ -73,6 +117,8 @@ CLAUDEX_SKIP_PERMISSIONS=1 claudex
 ```
 
 This is unsafe and is never enabled by default.
+
+`CLAUDEX_SKIP_PERMISSIONS=1` weakens Claude Code permission enforcement. Do not use it with Luna or Sol if you need their read-only guarantees enforced by the client; their definitions also prohibit mutations in their instructions.
 
 ## Re-authenticate
 

@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/claudex"
+RECEIPT_DIR="$STATE_HOME/reviews"
+
+usage() {
+  cat <<'EOF'
+Usage: claudex-review-receipt <write|check|classify> [review-file]
+
+write <review-file>  Validate a Sol JSON receipt and bind it to the current staged tree.
+check                Require a matching PASS receipt only for substantial/sensitive staged changes.
+classify             Print whether the current staged change requires review.
+EOF
+}
+
+require_git_repo() { git rev-parse --git-dir >/dev/null 2>&1 || { echo 'Claudex review gate: not a Git repository.' >&2; exit 2; }; }
+tree_hash() { git write-tree; }
+
+classification() {
+  local files lines roots
+  files="$(git diff --cached --name-only)"
+  [[ -n "$files" ]] || { echo "none"; return; }
+  if printf '%s\n' "$files" | grep -Eiq '(^|/)(auth|authentication|authorization|permissions?|payments?|billing|migrations?|schema|deploy|deployment|infra|terraform|k8s|docker|\.github/workflows)(/|$)|(^|/)(package\.json|pnpm-lock|package-lock|yarn\.lock|go\.mod|Cargo\.toml)$'; then
+    echo "sensitive"; return
+  fi
+  if git diff --cached --numstat | awk '{a+=$1; d+=$2} END {exit !(a+d >= 800)}'; then
+    echo "substantial"; return
+  fi
+  if [[ "$(printf '%s\n' "$files" | sed -E 's#/.*##' | sort -u | sed '/^$/d' | wc -l | tr -d ' ')" -ge 3 ]]; then
+    echo "substantial"; return
+  fi
+  if [[ "$(printf '%s\n' "$files" | wc -l | tr -d ' ')" -ge 20 ]]; then
+    echo "substantial"; return
+  fi
+  echo "small"
+}
+
+write_receipt() {
+  local review_file="${1:-}" tree destination
+  [[ -n "$review_file" && -r "$review_file" ]] || { usage >&2; exit 2; }
+  command -v python3 >/dev/null 2>&1 || { echo 'Claudex review gate requires python3 to validate review JSON.' >&2; exit 2; }
+  tree="$(tree_hash)"
+  mkdir -p "$RECEIPT_DIR"
+  destination="$RECEIPT_DIR/$tree.json"
+  python3 - "$review_file" "$destination" "$tree" <<'PY'
+import json, pathlib, sys, time
+source, destination, tree = sys.argv[1:]
+try:
+    value = json.load(open(source))
+except Exception as error:
+    raise SystemExit(f"Invalid Sol review JSON: {error}")
+if value.get("verdict") not in {"PASS", "CHANGES_REQUIRED", "BLOCKED"}:
+    raise SystemExit("Invalid Sol review JSON: verdict must be PASS, CHANGES_REQUIRED, or BLOCKED")
+if not isinstance(value.get("findings", []), list):
+    raise SystemExit("Invalid Sol review JSON: findings must be a list")
+for finding in value["findings"]:
+    if not isinstance(finding, dict) or not all(key in finding for key in ("severity", "problem", "required_action")):
+        raise SystemExit("Invalid Sol review JSON: every finding needs severity, problem, and required_action")
+value.update({"staged_tree": tree, "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "format": 1})
+pathlib.Path(destination).write_text(json.dumps(value, indent=2) + "\n")
+PY
+  echo "$destination"
+}
+
+check_receipt() {
+  local class tree receipt verdict
+  class="$(classification)"
+  [[ "$class" == "none" || "$class" == "small" ]] && { echo "Claudex review gate: $class staged change; no Sol receipt required."; return; }
+  tree="$(tree_hash)"; receipt="$RECEIPT_DIR/$tree.json"
+  [[ -r "$receipt" ]] || { echo "Claudex review gate: $class staged change requires a matching Sol PASS receipt. Run: claudex sol-review" >&2; exit 1; }
+  verdict="$(python3 - "$receipt" "$tree" <<'PY'
+import json, sys
+v=json.load(open(sys.argv[1]))
+if v.get('format') == 1 and v.get('staged_tree') == sys.argv[2]: print(v.get('verdict',''))
+PY
+)"
+  [[ "$verdict" == "PASS" ]] || { echo "Claudex review gate: matching Sol receipt verdict is ${verdict:-invalid}, not PASS." >&2; exit 1; }
+  echo "Claudex review gate: matching Sol PASS receipt found."
+}
+
+require_git_repo
+case "${1:-}" in
+  write) write_receipt "${2:-}" ;;
+  check) check_receipt ;;
+  classify) classification ;;
+  *) usage >&2; exit 2 ;;
+esac

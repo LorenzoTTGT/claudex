@@ -7,53 +7,49 @@ TOKEN_FILE="${CLAUDEX_TOKEN_FILE:-$CONFIG_HOME/token}"
 BASE_URL="${CLAUDEX_BASE_URL:-http://127.0.0.1:8317}"
 MODEL="${CLAUDEX_MODEL:-gpt-5.6-terra}"
 EFFORT="${CLAUDEX_EFFORT:-high}"
+AUTOCOMPACT="${CLAUDEX_AUTOCOMPACT:-auto}"
+LUNA_MODEL="${CLAUDEX_LUNA_MODEL:-gpt-5.6-luna}"
+SOL_MODEL="${CLAUDEX_SOL_MODEL:-gpt-5.6-sol}"
+STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/claudex"
 LOG_FILE="$CONFIG_HOME/cliproxyapi.log"
 
-find_binary() {
-  command -v "$1" 2>/dev/null || true
+usage() {
+  cat <<'EOF'
+Usage: claudex [terra|luna|sol|sol-review|review-gate|install-hook] [arguments]
+
+  claudex [args...]       Start the permanent Terra coordinator session.
+  claudex terra [args...] Explicit Terra session.
+  claudex luna <task>     Run a read-only Luna research/data task.
+  claudex sol <task>      Run a read-only Sol architecture task.
+  claudex sol-review      Review the staged change and save a Sol review receipt.
+  claudex review-gate     Check whether staged changes need a matching Sol PASS receipt.
+  claudex install-hook    Install the review gate in this repository's pre-commit hook.
+EOF
 }
 
+if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  usage
+  exit 0
+fi
+
+find_binary() { command -v "$1" 2>/dev/null || true; }
 CLAUDE_BIN="${CLAUDE_BIN:-$(find_binary claude)}"
 PROXY_BIN="${CLIPROXYAPI_BIN:-$(find_binary cliproxyapi)}"
 
-if [[ -z "$CLAUDE_BIN" ]]; then
-  printf 'Claudex: Claude Code is not installed. Run the Claudex installer again.\n' >&2
-  exit 1
-fi
-
-if [[ -z "$PROXY_BIN" ]]; then
-  printf 'Claudex: CLIProxyAPI is not installed. Run the Claudex installer again.\n' >&2
-  exit 1
-fi
-
-if [[ ! -r "$CONFIG_FILE" || ! -r "$TOKEN_FILE" ]]; then
-  printf 'Claudex: setup is incomplete. Expected %s and %s.\n' "$CONFIG_FILE" "$TOKEN_FILE" >&2
-  exit 1
-fi
+[[ -n "$CLAUDE_BIN" ]] || { echo 'Claudex: Claude Code is not installed. Run the Claudex installer again.' >&2; exit 1; }
+[[ -n "$PROXY_BIN" ]] || { echo 'Claudex: CLIProxyAPI is not installed. Run the Claudex installer again.' >&2; exit 1; }
+[[ -r "$CONFIG_FILE" && -r "$TOKEN_FILE" ]] || { printf 'Claudex: setup is incomplete. Expected %s and %s.\n' "$CONFIG_FILE" "$TOKEN_FILE" >&2; exit 1; }
 
 TOKEN="$(<"$TOKEN_FILE")"
-
 proxy_ready() {
-  curl --silent --fail --max-time 2 \
-    -H "Authorization: Bearer $TOKEN" \
-    "$BASE_URL/v1/models" >/dev/null 2>&1
+  curl --silent --fail --max-time 2 -H "Authorization: Bearer $TOKEN" "$BASE_URL/v1/models" >/dev/null 2>&1
 }
-
 if ! proxy_ready; then
   mkdir -p "$CONFIG_HOME"
   nohup "$PROXY_BIN" -config "$CONFIG_FILE" >>"$LOG_FILE" 2>&1 &
-
-  for _ in {1..30}; do
-    proxy_ready && break
-    sleep 0.2
-  done
+  for _ in {1..30}; do proxy_ready && break; sleep 0.2; done
 fi
-
-if ! proxy_ready; then
-  printf 'Claudex: the local proxy did not become ready at %s.\n' "$BASE_URL" >&2
-  printf 'Check %s. Another service may already be using port 8317.\n' "$LOG_FILE" >&2
-  exit 1
-fi
+proxy_ready || { printf 'Claudex: the local proxy did not become ready at %s.\nCheck %s. Another service may already be using port 8317.\n' "$BASE_URL" "$LOG_FILE" >&2; exit 1; }
 
 export ANTHROPIC_BASE_URL="$BASE_URL"
 export ANTHROPIC_AUTH_TOKEN="$TOKEN"
@@ -62,8 +58,51 @@ export ANTHROPIC_DEFAULT_OPUS_MODEL="${CLAUDEX_OPUS_MODEL:-$MODEL}"
 export ANTHROPIC_DEFAULT_SONNET_MODEL="${CLAUDEX_SONNET_MODEL:-$MODEL}"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="${CLAUDEX_HAIKU_MODEL:-gpt-5.6-luna}"
 
-if [[ "${CLAUDEX_SKIP_PERMISSIONS:-0}" == "1" ]]; then
-  exec "$CLAUDE_BIN" --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions "$@"
-fi
+claude_command() {
+  if [[ "${CLAUDEX_SKIP_PERMISSIONS:-0}" == "1" ]]; then "$CLAUDE_BIN" --dangerously-skip-permissions "$@"; else "$CLAUDE_BIN" "$@"; fi
+}
+run_terra() { claude_command --agent claudex-terra --model "$MODEL" --effort "$EFFORT" --autocompact "$AUTOCOMPACT" "$@"; }
+run_luna() {
+  [[ $# -gt 0 ]] || { echo 'Claudex: luna requires a task prompt.' >&2; exit 2; }
+  claude_command --agent claudex-luna --model "$LUNA_MODEL" --effort medium --permission-mode plan --autocompact "$AUTOCOMPACT" "$@"
+}
+run_sol() {
+  [[ $# -gt 0 ]] || { echo 'Claudex: sol requires a task prompt.' >&2; exit 2; }
+  claude_command --agent claudex-sol --model "$SOL_MODEL" --effort xhigh --permission-mode plan --autocompact "$AUTOCOMPACT" "$@"
+}
 
-exec "$CLAUDE_BIN" --model "$MODEL" --effort "$EFFORT" "$@"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+run_sol_review() {
+  git rev-parse --git-dir >/dev/null 2>&1 || { echo 'Claudex: sol-review must run in a Git repository.' >&2; exit 2; }
+  local review_file prompt receipt verdict
+  mkdir -p "$STATE_HOME/tmp"
+  review_file="$(mktemp "$STATE_HOME/tmp/sol-review.XXXXXX.json")"
+  trap 'rm -f "$review_file"' EXIT
+  prompt='Review the current staged Git diff. Inspect relevant repository context with read-only tools. Return only valid JSON with this exact shape: {"verdict":"PASS|CHANGES_REQUIRED|BLOCKED","summary":"...","findings":[{"severity":"high|medium|low","file":"path or null","line":1,"problem":"...","failure_scenario":"...","required_action":"... or null"}],"uncertainties":["..."]}. Use PASS only when no material correction is required.'
+  claude_command --agent claudex-sol --model "$SOL_MODEL" --effort xhigh --permission-mode plan --autocompact "$AUTOCOMPACT" --print --output-format text "$prompt" >"$review_file"
+  receipt="$("$SCRIPT_DIR/claudex-review-receipt" write "$review_file")"
+  verdict="$(python3 - "$receipt" <<'PY'
+import json, sys
+print(json.load(open(sys.argv[1]))['verdict'])
+PY
+)"
+  [[ "$verdict" == "PASS" ]] || { echo "Claudex: Sol review verdict is $verdict; receipt saved, but the review gate remains blocked." >&2; return 1; }
+  echo 'Claudex: Sol PASS receipt saved for the current staged tree.'
+}
+install_hook() {
+  local hook_dir
+  hook_dir="$(git rev-parse --git-path hooks)" || { echo 'Claudex: install-hook must run in a Git repository.' >&2; exit 2; }
+  mkdir -p "$hook_dir"
+  install -m 755 "$SCRIPT_DIR/../hooks/pre-commit" "$hook_dir/pre-commit"
+  echo "Claudex: installed review gate at $hook_dir/pre-commit"
+}
+
+case "${1:-}" in
+  luna) shift; run_luna "$@" ;;
+  sol) shift; run_sol "$@" ;;
+  sol-review) shift; [[ $# -eq 0 ]] || { usage >&2; exit 2; }; run_sol_review ;;
+  review-gate) shift; [[ $# -eq 0 ]] || { usage >&2; exit 2; }; exec "$SCRIPT_DIR/claudex-review-receipt" check ;;
+  install-hook) shift; [[ $# -eq 0 ]] || { usage >&2; exit 2; }; install_hook ;;
+  terra) shift; run_terra "$@" ;;
+  *) run_terra "$@" ;;
+esac

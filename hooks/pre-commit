@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Claudex-managed pre-commit hook
+# asset-version: __CLAUDEX_ASSET_VERSION__
+
+CLAUDEX_BIN="__CLAUDEX_BIN__"
+
+exec "$CLAUDEX_BIN" gate check --hook

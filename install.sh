@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/claudex"
 BIN_HOME="$HOME/.local/bin"
+AGENT_HOME="$HOME/.claude/agents"
 CONFIG_FILE="$CONFIG_HOME/cliproxyapi.yaml"
 TOKEN_FILE="$CONFIG_HOME/token"
 SKIP_LOGIN=0
@@ -59,7 +60,7 @@ install_dependencies() {
 }
 
 configure_claudex() {
-  mkdir -p "$CONFIG_HOME" "$BIN_HOME"
+  mkdir -p "$CONFIG_HOME" "$BIN_HOME" "$AGENT_HOME"
   chmod 700 "$CONFIG_HOME"
 
   if [[ ! -f "$TOKEN_FILE" ]]; then
@@ -77,6 +78,10 @@ configure_claudex() {
   fi
 
   install -m 755 "$ROOT_DIR/bin/claudex" "$BIN_HOME/claudex"
+  install -m 755 "$ROOT_DIR/bin/claudex-review-receipt" "$BIN_HOME/claudex-review-receipt"
+  install -m 644 "$ROOT_DIR/agents/claudex-terra.md" "$AGENT_HOME/claudex-terra.md"
+  install -m 644 "$ROOT_DIR/agents/claudex-luna.md" "$AGENT_HOME/claudex-luna.md"
+  install -m 644 "$ROOT_DIR/agents/claudex-sol.md" "$AGENT_HOME/claudex-sol.md"
 }
 
 ensure_path() {
@@ -126,6 +131,7 @@ main() {
   printf '\nClaudex installed successfully.\n'
   printf 'Default model: gpt-5.6-terra\n'
   printf 'Default effort: high\n'
+  printf 'Installed agents: Terra coordinator, Luna data/research, Sol architecture/review\n'
   printf 'Start it with: claudex\n'
   printf 'Verify dependencies with: claude --version && codex --version && cliproxyapi --help\n'
 }
