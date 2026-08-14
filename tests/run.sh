@@ -22,6 +22,20 @@ grep -Fq 'independent Sol review before Terra approves the plan or starts implem
 grep -Fq 'another independent Sol review before Terra treats the change as complete or merge-ready' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require an independent Sol review before consequential completion'
 grep -Fq 'at most three concurrently' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must cap concurrent subagents at three'
 grep -Fq 'A generic planning agent is not a substitute for Sol review.' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must reject generic planning as a Sol substitute'
+test -f "$ROOT_DIR/docs/claude-code-supervisor.md" || fail 'Claudex must retain its Claude Code session supervision assessment'
+grep -Fq 'Do not infer that a Claude Code/Claudex session is dead because it has been quiet' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must reject silence as a session-death signal'
+grep -Fq 'Do not implement or install session monitoring, lifecycle observation machinery, agent-view polling, process watchers, session-state persistence, automatic resume, restart, or steering from those signals.' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must prohibit unreviewed monitoring and hook-driven lifecycle control'
+grep -Fq 'known opaque session ID, structured authoritative evidence, exclusive per-session ownership or lease' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require reviewed continuation prerequisites'
+grep -Fq 'does not currently autonomously monitor, restart, select, or resume Claude Code sessions.' "$ROOT_DIR/README.md" || fail 'README must preserve the docs-only supervision boundary'
+grep -Fq 'User-supplied Claude Code arguments, including `claudex --resume`, are transparently passed through' "$ROOT_DIR/README.md" || fail 'README must distinguish native user-directed resume from supervisor control'
+grep -Fq 'policy and documentation only' "$ROOT_DIR/docs/claude-code-supervisor.md" || fail 'assessment must retain policy-only status'
+grep -Fq 'does not currently install hooks, autonomously monitor sessions' "$ROOT_DIR/docs/claude-code-supervisor.md" || fail 'assessment must prohibit installed hooks and autonomous monitoring'
+grep -Fq 'Do not infer that a thread has stopped because it has been quiet for two minutes.' "$ROOT_DIR/docs/claude-code-supervisor.md" || fail 'assessment must reject silence as session-death proof'
+grep -Fq 'must never use ambient “most recent session” selection' "$ROOT_DIR/docs/claude-code-supervisor.md" || fail 'assessment must require explicit session selection'
+grep -Fq 'Before a resume can even be proposed' "$ROOT_DIR/docs/claude-code-supervisor.md" || fail 'assessment must retain continuation prerequisites'
+! grep -Fq 'agents --json' "$ROOT_DIR/bin/claudex" || fail 'launcher must not poll local agent view'
+! grep -Fq 'session_id' "$ROOT_DIR/bin/claudex" || fail 'launcher must not persist session identifiers'
+! grep -Fq 'hooks' "$ROOT_DIR/install.sh" || fail 'installer must not install lifecycle hooks'
 grep -Fq 'before you approve the plan or start implementation' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must require Sol review before consequential implementation'
 grep -Fq 'before you treat the change as complete or merge-ready' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must require Sol review before consequential completion'
 
@@ -75,6 +89,28 @@ env \
   "$INSTALL_HOME/.local/bin/claudex" --print 'Reply with exactly: OK' >/dev/null
 grep -Fq -- '--append-system-prompt' "$CLAUDE_ARGS_LOG" || fail 'installed launcher must append the installed routing prompt'
 grep -Fq 'sentinel routing prompt from installed file' "$CLAUDE_ARGS_LOG" || fail 'installed launcher must consume the installed routing prompt file'
+! grep -Eq -- '^--(resume|continue)(=|$)' "$CLAUDE_ARGS_LOG" || fail 'ordinary launcher invocation must not synthesize resume or session selection arguments'
+
+rm -f "$CLAUDE_ARGS_LOG"
+env \
+  HOME="$INSTALL_HOME" \
+  XDG_CONFIG_HOME="$INSTALL_XDG" \
+  PATH="$INSTALL_MOCK_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  CLAUDEX_PROXY_CONFIG="$INSTALL_XDG/claudex/cliproxyapi.yaml" \
+  CLAUDEX_TOKEN_FILE="$INSTALL_XDG/claudex/token" \
+  CLAUDEX_SKIP_PERMISSIONS=0 \
+  CLAUDE_ARGS_LOG="$CLAUDE_ARGS_LOG" \
+  "$INSTALL_HOME/.local/bin/claudex" --resume session-fixture-42 >/dev/null
+python3 - "$CLAUDE_ARGS_LOG" <<'PY'
+import sys
+args = open(sys.argv[1]).read().splitlines()
+assert args.count("--resume") == 1, args
+assert args.count("session-fixture-42") == 1, args
+index = args.index("--resume")
+assert args[index + 1] == "session-fixture-42", args
+assert not any(arg == "--continue" or arg.startswith("--continue=") or arg.startswith("--resume=") for arg in args), args
+PY
 
 REPO="$TMP_DIR/repo"
 mkdir -p "$REPO"

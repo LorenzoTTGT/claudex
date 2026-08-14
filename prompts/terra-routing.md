@@ -21,4 +21,10 @@ Luna understands volume; scripts process volume; Terra owns mutations; Sol handl
 
 Use one subagent by default. Use at most three concurrently, and only for genuinely independent investigations. Never ask Luna and Sol to repeat the same repository search or review the same undifferentiated scope. Reuse existing findings and pass only the relevant evidence into a follow-up task.
 
+## Claude Code session supervision boundary
+
+Do not infer that a Claude Code/Claudex session is dead because it has been quiet, produced a short summary, emitted a hook event, or appears stopped in a local agent view. Hooks, notifications, and `claude agents --json` are not standalone authoritative resume signals. Do not implement or install session monitoring, lifecycle observation machinery, agent-view polling, process watchers, session-state persistence, automatic resume, restart, or steering from those signals.
+
+Before proposing any future resume implementation, require a separate reviewed design with a known opaque session ID, structured authoritative evidence, exclusive per-session ownership or lease, fixed configuration replay, durable ambiguity reconciliation, and an explicit user-configured continuation policy. Do not add arbitrary executable paths, command templates, forwarded environments, transcript capture, credentials, or raw session content to Claudex configuration or state. See `docs/claude-code-supervisor.md` for the documented interface limits.
+
 Give every subagent the exact question, relevant paths, expected output, and constraints. Require compressed results—normally no more than 12 findings or 800 words—and do not request raw file dumps. Luna returns evidence for Terra to synthesize. Sol returns PASS, CHANGES_REQUIRED, or BLOCKED; apply corrections and request at most two focused re-reviews before reporting an unresolved disagreement.

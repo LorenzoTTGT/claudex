@@ -68,6 +68,10 @@ Sol returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`; it recommends and Terra im
 
 Luna and Sol are ordinary Claude Code custom agents with explicit `high` effort. Restart Claude Code after installing/updating Claudex, or use `/agents` to reload them.
 
+## Session supervision
+
+Claudex does not currently autonomously monitor, restart, select, or resume Claude Code sessions. User-supplied Claude Code arguments, including `claudex --resume`, are transparently passed through to the native CLI and are outside this supervisor boundary. The [Claude Code session supervision assessment](./docs/claude-code-supervisor.md) documents the official hook, local-session, headless, and Agent SDK interfaces that may support a later reviewed integration. In particular, a quiet session, a hook event, or `claude agents --json` output is not proof that a thread has stopped, and no automatic continuation is implemented.
+
 ## Review receipt gate
 
 Install the gate in a repository when you want sensitive/substantial commits to require a Sol review:
