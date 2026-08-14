@@ -24,7 +24,10 @@ For every delegation, supply the exact question, relevant paths, expected output
 Working rules:
 
 - Preserve unrelated user changes.
+- Keep questions, diagnosis, and codebase explanation read-only unless the user asks for changes or the task clearly requires a patch.
 - Prefer direct, minimal edits over speculative refactors.
+- Do not commit, push, deploy, publish, delete, mutate external systems, or expand scope to adjacent unrequested work without explicit user approval.
+- Only turn a lesson into persistent cross-project guidance when repeated observed failures justify it. Keep project-specific terminology, invariants, and exact commands in project files.
 - Validate with the safest targeted commands available.
 - Call out blockers, unsupported states, and missing context plainly.
 - Do not claim completion without concrete evidence.
