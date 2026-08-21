@@ -5,8 +5,10 @@ Claudex launches **Claude Code** through a local [CLIProxyAPI](https://github.co
 Defaults:
 
 - Terra: `gpt-5.6-terra` / high — permanent coordinator and implementer
-- Luna: `gpt-5.6-luna` — read-only research and data-operations worker
-- Sol: `gpt-5.6-sol` — read-only architecture and substantial-change reviewer
+- Luna: `gpt-5.6-luna` / high — read-only research and data-operations worker
+- Frontend: `gpt-5.5` / high — bounded GUI/frontend implementation and code-generation worker
+- Sol advisory: `gpt-5.6-sol` / medium — read-only architecture advice and early risk triage
+- Sol Review: `gpt-5.6-sol` / high — read-only consequential-change and final-review gate
 - Proxy: localhost only (`127.0.0.1:8317`)
 - Claude Code permission prompts: bypassed by default
 
@@ -29,7 +31,7 @@ The installer:
 5. Generates a unique local proxy token.
 6. Installs the `claudex` launcher to `~/.local/bin`.
 7. Installs the source-controlled Terra routing prompt to `~/.config/claudex/terra-routing.md`.
-8. Installs the three Claudex subagent definitions to `~/.claude/agents`.
+8. Installs the five Claudex agent definitions to `~/.claude/agents`.
 9. Starts the Codex OAuth login when credentials are not already present.
 
 Restart your shell after installation if `claudex` is not immediately found.
@@ -58,19 +60,26 @@ claudex luna "Inventory the request-validation paths and tests."
 # Read-only architecture analysis.
 claudex sol "Compare the migration strategies for this schema change."
 
+# Bounded frontend implementation using GPT-5.5/high.
+claudex frontend "Implement the requested responsive settings panel and its frontend tests."
+
 # Read-only review of the current staged diff. A valid PASS creates a receipt.
 claudex sol-review
 ```
 
 Luna is for broad, rule-based work: inventories, data-quality checks, naming consistency, log grouping, and parsing/transform plans. It must not edit files or change state. Use deterministic scripts for known bulk transformations.
 
-Sol returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`; it recommends and Terra implements. Use Sol for architecture decisions and substantial or sensitive changes. For consequential work, Terra must get an independent Sol review before approving the plan or starting implementation, and another independent Sol review before treating the work as complete or merge-ready. A generic planning agent is not a substitute. Keep Terra ↔ Sol correction loops to two; surface disagreements after that.
+Frontend is a fixed `gpt-5.5` / high-effort implementer for bounded UI components, styling, accessibility, responsive behavior, frontend tests, and directly necessary frontend-local assets. It may not change backend logic, schemas, authentication, public APIs, deployment, or unrelated shared infrastructure; when ownership is unclear, it returns the boundary to Terra. Terra retains task decomposition, verification synthesis, final integration, and completion reporting. Frontend implementation and tests never replace a required Sol Review or review receipt.
 
-Luna and Sol are ordinary Claude Code custom agents with explicit `high` effort. Restart Claude Code after installing/updating Claudex, or use `/agents` to reload them.
+Use medium-effort Sol for bounded architecture alternatives, early risk triage, and implementation-plan feedback. It is advisory only. Sol Review returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`; it recommends and Terra implements. Use high-effort Sol Review for consequential decisions and substantial or sensitive diffs. For consequential work, Terra must get an independent high-effort Sol Review before approving the plan or starting implementation, and another independent high-effort Sol Review before treating the work as complete or merge-ready. Medium advisory Sol and a generic planning agent are not substitutes. Keep Terra ↔ Sol Review correction loops to two; surface disagreements after that.
+
+Luna, Frontend, Sol advisory, and Sol Review are ordinary Claude Code custom agents with fixed `high`, `high`, `medium`, and `high` effort respectively. Frontend's agent, model, and effort are intentionally fixed and cannot be overridden from its command. Existing users must rerun the installer after updating Claudex, then restart Claude Code or use `/agents` to reload the definitions.
+
+For a non-trivial request, Terra keeps an in-session checklist and carries available investigation, implementation, validation, and integration steps through to completion instead of reporting an intention to do the next step later. A request for planning, explanation, read-only analysis, or a partial checkpoint limits the requested scope; Terra still completes that requested analysis or checkpoint with the available evidence. The contract never bypasses approval or authorization boundaries.
 
 ## Session supervision
 
-Claudex does not currently autonomously monitor, restart, select, or resume Claude Code sessions. User-supplied Claude Code arguments, including `claudex --resume`, are transparently passed through to the native CLI and are outside this supervisor boundary. The [Claude Code session supervision assessment](./docs/claude-code-supervisor.md) documents the official hook, local-session, headless, and Agent SDK interfaces that may support a later reviewed integration. In particular, a quiet session, a hook event, or `claude agents --json` output is not proof that a thread has stopped, and no automatic continuation is implemented.
+The same-session completion contract is agent work discipline, not lifecycle automation: it adds no hooks, polling, process watching, task/session persistence, automatic resume/restart, session selection, or synthetic continuation. Claudex does not currently autonomously monitor, restart, select, or resume Claude Code sessions. User-supplied Claude Code arguments, including `claudex --resume`, are transparently passed through to the native CLI and are outside this supervisor boundary. The [Claude Code session supervision assessment](./docs/claude-code-supervisor.md) documents the official hook, local-session, headless, and Agent SDK interfaces that may support a later reviewed integration. In particular, a quiet session, a hook event, or `claude agents --json` output is not proof that a thread has stopped, and no automatic continuation is implemented.
 
 ## Review receipt gate
 
@@ -111,7 +120,7 @@ CLIProxyAPI starts automatically on the first launch and remains local to the co
 Override defaults for one invocation:
 
 ```bash
-CLAUDEX_MODEL=gpt-5.6-sol CLAUDEX_EFFORT=xhigh claudex
+CLAUDEX_MODEL=gpt-5.6-sol CLAUDEX_EFFORT=high claudex
 ```
 
 Supported variables:
@@ -119,16 +128,19 @@ Supported variables:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `CLAUDEX_MODEL` | `gpt-5.6-terra` | Main model |
-| `CLAUDEX_EFFORT` | `high` | Reasoning effort |
+| `CLAUDEX_EFFORT` | `high` | Main-session reasoning effort (`xhigh` is rejected) |
 | `CLAUDEX_OPUS_MODEL` | `gpt-5.6-sol` | Custom Opus route shown in `/model` |
 | `CLAUDEX_HAIKU_MODEL` | `gpt-5.6-luna` | Lightweight model route |
 | `CLAUDEX_LUNA_MODEL` | `gpt-5.6-luna` | Luna subagent model |
 | `CLAUDEX_SOL_MODEL` | `gpt-5.6-sol` | Sol subagent model |
 | `CLAUDEX_AUTOCOMPACT` | `220k` | Claude Code compaction threshold (`auto` or a supported token value) |
+| `CLAUDEX_TELEMETRY` | `0` | Opt-in local, content-free launcher telemetry |
 | `CLAUDEX_TERRA_PROMPT_FILE` | `~/.config/claudex/terra-routing.md` | Appended native-agent routing policy |
 | `CLAUDEX_BASE_URL` | `http://127.0.0.1:8317` | Local proxy URL |
 | `CLAUDEX_PROXY_CONFIG` | `~/.config/claudex/cliproxyapi.yaml` | Proxy configuration |
 | `CLAUDEX_TOKEN_FILE` | `~/.config/claudex/token` | Local proxy token |
+
+`CLAUDEX_EFFORT` and a Terra CLI `--effort` argument control only the main Terra session. Luna, Frontend, Sol advisory, and Sol Review have fixed role efforts. Frontend also fixes its agent and model to `claudex-frontend` and `gpt-5.5`; its command rejects agent, model, and effort overrides. `xhigh` is unsupported and rejected before Claudex starts or probes the proxy.
 
 Claudex bypasses Claude Code permission prompts by default. Re-enable them for one session:
 
@@ -137,6 +149,16 @@ CLAUDEX_SKIP_PERMISSIONS=0 claudex
 ```
 
 `CLAUDEX_SKIP_PERMISSIONS=1` weakens Claude Code permission enforcement. Use `CLAUDEX_SKIP_PERMISSIONS=0` with Luna or Sol if you need their read-only guarantees enforced by the client; their definitions also prohibit mutations in their instructions.
+
+### Local launcher telemetry
+
+Set `CLAUDEX_TELEMETRY=1` to write opt-in, local-only JSONL records to `${XDG_STATE_HOME:-~/.local/state}/claudex/telemetry/events.jsonl`. The directory is private, telemetry is capped at 5 MiB, and deleting that directory erases all telemetry. Nothing is sent over the network.
+
+Records contain only allowlisted launcher observations: a random invocation identifier, launcher telemetry revision, selected route/mode/effort/autocompact category, proxy-start/readiness observations, direct Claude child elapsed time and exit code, and Sol-review verdict/receipt status. They never contain prompts, arguments, transcripts, paths, repositories, credentials, provider payloads, stdout/stderr, process IDs, Claude session IDs, or raw environment values.
+
+This is not session supervision. A child exit code or proxy readiness does not prove a Claude Code session completed, and telemetry does not observe token usage, provider retries, native delegation, actual compaction, cost, or any session lifecycle state. It never retries, resumes, restarts, or steers a session. Telemetry write failures are ignored so they cannot stop Claude Code from launching.
+
+For a comparison, use separate runs of the same externally managed task, warm up first, and repeat each configuration. Group records by their fixed route, effort, autocompact, and launcher revision tuple; change one routing variable at a time. Keep benchmark prompts, task identity, outputs, and quality assessment outside telemetry. A future token/event integration needs separate review and must use an upstream structured, content-free, invocation-correlated source.
 
 ## Re-authenticate
 

@@ -84,6 +84,8 @@ configure_claudex() {
   install -m 644 "$ROOT_DIR/agents/claudex-terra.md" "$AGENT_HOME/claudex-terra.md"
   install -m 644 "$ROOT_DIR/agents/claudex-luna.md" "$AGENT_HOME/claudex-luna.md"
   install -m 644 "$ROOT_DIR/agents/claudex-sol.md" "$AGENT_HOME/claudex-sol.md"
+  install -m 644 "$ROOT_DIR/agents/claudex-sol-review.md" "$AGENT_HOME/claudex-sol-review.md"
+  install -m 644 "$ROOT_DIR/agents/claudex-frontend.md" "$AGENT_HOME/claudex-frontend.md"
 }
 
 ensure_path() {
@@ -138,7 +140,7 @@ main() {
   printf '\nClaudex installed successfully.\n'
   printf 'Default model: gpt-5.6-terra\n'
   printf 'Default effort: high\n'
-  printf 'Installed agents: Terra coordinator, Luna data/research, Sol architecture/review\n'
+  printf 'Installed agents: Terra coordinator, Luna data/research, Frontend implementer, Sol advisory, Sol Review gate\n'
   printf 'Start it with: claudex\n'
   printf 'Verify dependencies with: claude --version && codex --version && cliproxyapi --help\n'
 }

@@ -38,6 +38,8 @@ Documented notifications include idle prompts, a need for user input, and comple
 
 Claudex’s current `bin/claudex` launcher deliberately delegates session lifecycle to Claude Code. It does not interpret hook events, call `claude agents --json`, synthesize `--resume`, select a prior session, or persist session identifiers. A user may supply native Claude Code arguments such as `--resume`, and the launcher passes them through unchanged; that user-directed behavior is not Claudex lifecycle control.
 
+`CLAUDEX_TELEMETRY=1` is a narrow exception for content-free, invocation-scoped aggregate launcher accounting. It may record only the launcher’s direct child elapsed time and exit result plus proxy-start/readiness observations. Those fields are not evidence that a session completed or a proxy request succeeded, and telemetry must not inspect content, infer lifecycle state, poll, retry, resume, restart, or steer Claude Code.
+
 The source-controlled [Terra routing policy](../prompts/terra-routing.md) requires the following boundary for all current and future work:
 
 - Do not treat hook events, local agent view state, silence, or a short final summary as proof that a session is dead.
