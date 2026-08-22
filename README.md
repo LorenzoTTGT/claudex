@@ -4,11 +4,11 @@ Claudex launches **Claude Code** through a local [CLIProxyAPI](https://github.co
 
 Defaults:
 
-- Terra: `gpt-5.6-terra` / high — permanent coordinator and implementer
+- Coordinator: `gpt-5.5` / medium — permanent coordinator and implementer (`terra` remains a compatibility alias)
 - Luna: `gpt-5.6-luna` / high — read-only research and data-operations worker
 - Frontend: `gpt-5.5` / high — bounded GUI/frontend implementation and code-generation worker
 - Sol advisory: `gpt-5.6-sol` / medium — read-only architecture advice and early risk triage
-- Sol Review: `gpt-5.6-sol` / high — read-only consequential-change and final-review gate
+- Sol Review: `gpt-5.6-sol` / medium — read-only consequential-change and final-review gate
 - Proxy: localhost only (`127.0.0.1:8317`)
 - Claude Code permission prompts: bypassed by default
 
@@ -51,7 +51,7 @@ claudex --print "Reply with exactly: OK"
 
 ## Agent workflow
 
-`claudex` keeps the native Claude Code main agent on Terra. It appends the source-controlled routing policy from `prompts/terra-routing.md` rather than replacing Claude Code’s main system prompt, so native planning and built-in delegation remain available. The policy delegates only bounded side work:
+`claudex` keeps the native Claude Code main agent on GPT-5.5/medium. It appends the source-controlled routing policy from `prompts/terra-routing.md` rather than replacing Claude Code’s main system prompt, so native planning and built-in delegation remain available. Terra-named files and commands remain compatibility aliases. The policy delegates only bounded side work:
 
 ```bash
 # Read-only repository/data investigation; returns compressed findings.
@@ -69,11 +69,11 @@ claudex sol-review
 
 Luna is for broad, rule-based work: inventories, data-quality checks, naming consistency, log grouping, and parsing/transform plans. It must not edit files or change state. Use deterministic scripts for known bulk transformations.
 
-Frontend is a fixed `gpt-5.5` / high-effort implementer for bounded UI components, styling, accessibility, responsive behavior, frontend tests, and directly necessary frontend-local assets. It may not change backend logic, schemas, authentication, public APIs, deployment, or unrelated shared infrastructure; when ownership is unclear, it returns the boundary to Terra. Terra retains task decomposition, verification synthesis, final integration, and completion reporting. Frontend implementation and tests never replace a required Sol Review or review receipt.
+Frontend is a fixed `gpt-5.5` / high-effort implementer for bounded UI components, styling, accessibility, responsive behavior, frontend tests, and directly necessary frontend-local assets. It may not change backend logic, schemas, authentication, public APIs, deployment, or unrelated shared infrastructure; when ownership is unclear, it returns the boundary to the coordinator. The coordinator retains task decomposition, verification synthesis, final integration, and completion reporting. Frontend implementation and tests never replace a required Sol Review or review receipt.
 
-Use medium-effort Sol for bounded architecture alternatives, early risk triage, and implementation-plan feedback. It is advisory only. Sol Review returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`; it recommends and Terra implements. Use high-effort Sol Review for consequential decisions and substantial or sensitive diffs. For consequential work, Terra must get an independent high-effort Sol Review before approving the plan or starting implementation, and another independent high-effort Sol Review before treating the work as complete or merge-ready. Medium advisory Sol and a generic planning agent are not substitutes. Keep Terra ↔ Sol Review correction loops to two; surface disagreements after that.
+Use medium-effort Sol for bounded architecture alternatives, early risk triage, implementation-plan feedback, consequential decisions, and substantial or sensitive diff review. Sol Review returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`; it recommends and the GPT-5.5 coordinator implements. For consequential work, the coordinator must get an independent medium-effort Sol Review before approving the plan or starting implementation, and another before treating the work as complete or merge-ready. Keep coordinator ↔ Sol Review correction loops to two; surface disagreements after that.
 
-Luna, Frontend, Sol advisory, and Sol Review are ordinary Claude Code custom agents with fixed `high`, `high`, `medium`, and `high` effort respectively. Frontend's agent, model, and effort are intentionally fixed and cannot be overridden from its command. Existing users must rerun the installer after updating Claudex, then restart Claude Code or use `/agents` to reload the definitions.
+Luna, Frontend, Sol advisory, and Sol Review are ordinary Claude Code custom agents with fixed `high`, `high`, `medium`, and `medium` effort respectively. Frontend's agent, model, and effort are intentionally fixed and cannot be overridden from its command. Existing users must rerun the installer after updating Claudex, then restart Claude Code or use `/agents` to reload the definitions.
 
 For a non-trivial request, Terra keeps an in-session checklist and carries available investigation, implementation, validation, and integration steps through to completion instead of reporting an intention to do the next step later. A request for planning, explanation, read-only analysis, or a partial checkpoint limits the requested scope; Terra still completes that requested analysis or checkpoint with the available evidence. The contract never bypasses approval or authorization boundaries.
 
@@ -127,8 +127,8 @@ Supported variables:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `CLAUDEX_MODEL` | `gpt-5.6-terra` | Main model |
-| `CLAUDEX_EFFORT` | `high` | Main-session reasoning effort (`xhigh` is rejected) |
+| `CLAUDEX_MODEL` | `gpt-5.5` | Main model |
+| `CLAUDEX_EFFORT` | `medium` | Main-session reasoning effort (`xhigh` is rejected) |
 | `CLAUDEX_OPUS_MODEL` | `gpt-5.6-sol` | Custom Opus route shown in `/model` |
 | `CLAUDEX_HAIKU_MODEL` | `gpt-5.6-luna` | Lightweight model route |
 | `CLAUDEX_LUNA_MODEL` | `gpt-5.6-luna` | Luna subagent model |
@@ -140,7 +140,7 @@ Supported variables:
 | `CLAUDEX_PROXY_CONFIG` | `~/.config/claudex/cliproxyapi.yaml` | Proxy configuration |
 | `CLAUDEX_TOKEN_FILE` | `~/.config/claudex/token` | Local proxy token |
 
-`CLAUDEX_EFFORT` and a Terra CLI `--effort` argument control only the main Terra session. Luna, Frontend, Sol advisory, and Sol Review have fixed role efforts. Frontend also fixes its agent and model to `claudex-frontend` and `gpt-5.5`; its command rejects agent, model, and effort overrides. `xhigh` is unsupported and rejected before Claudex starts or probes the proxy.
+`CLAUDEX_EFFORT` and a compatibility `terra` CLI `--effort` argument control only the main GPT-5.5 session. Luna, Frontend, Sol advisory, and Sol Review have fixed role efforts. Frontend also fixes its agent and model to `claudex-frontend` and `gpt-5.5`; its command rejects agent, model, and effort overrides. `xhigh` is unsupported and rejected before Claudex starts or probes the proxy.
 
 Claudex bypasses Claude Code permission prompts by default. Re-enable them for one session:
 

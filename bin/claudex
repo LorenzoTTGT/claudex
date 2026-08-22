@@ -5,8 +5,8 @@ CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/claudex"
 CONFIG_FILE="${CLAUDEX_PROXY_CONFIG:-$CONFIG_HOME/cliproxyapi.yaml}"
 TOKEN_FILE="${CLAUDEX_TOKEN_FILE:-$CONFIG_HOME/token}"
 BASE_URL="${CLAUDEX_BASE_URL:-http://127.0.0.1:8317}"
-MODEL="${CLAUDEX_MODEL:-gpt-5.6-terra}"
-EFFORT="${CLAUDEX_EFFORT:-high}"
+MODEL="${CLAUDEX_MODEL:-gpt-5.5}"
+EFFORT="${CLAUDEX_EFFORT:-medium}"
 AUTOCOMPACT="${CLAUDEX_AUTOCOMPACT:-220k}"
 LUNA_MODEL="${CLAUDEX_LUNA_MODEL:-gpt-5.6-luna}"
 SOL_MODEL="${CLAUDEX_SOL_MODEL:-gpt-5.6-sol}"
@@ -21,7 +21,7 @@ TELEMETRY_REVISION=2
 TELEMETRY_INVOCATION_ID=""
 TELEMETRY_MODE="terra"
 TELEMETRY_ROUTE="terra"
-TELEMETRY_EFFORT="high"
+TELEMETRY_EFFORT="medium"
 TELEMETRY_AUTOCOMPACT="220k"
 TELEMETRY_PROXY_STARTED=0
 TELEMETRY_PROXY_READY=0
@@ -33,12 +33,12 @@ usage() {
   cat <<'EOF'
 Usage: claudex [terra|luna|sol|frontend|sol-review|review-gate|install-hook] [arguments]
 
-  claudex [args...]       Start the permanent Terra coordinator session.
-  claudex terra [args...] Explicit Terra session.
+  claudex [args...]       Start the GPT-5.5 coordinator session.
+  claudex terra [args...] Backward-compatible coordinator alias.
   claudex luna <task>     Run a read-only Luna research/data task.
   claudex sol <task>      Run a medium-effort read-only Sol architecture advisory.
   claudex frontend <task> Run a high-effort bounded GPT-5.5 frontend implementation task.
-  claudex sol-review      Run a high-effort staged-change Sol Review and save a receipt.
+  claudex sol-review      Run a medium-effort staged-change Sol Review and save a receipt.
   claudex review-gate     Check whether staged changes need a matching Sol PASS receipt.
   claudex install-hook    Install the review gate in this repository's pre-commit hook.
 EOF
@@ -147,7 +147,7 @@ telemetry_route() {
     gpt-5.6-terra) printf 'terra\n' ;;
     gpt-5.6-luna) printf 'luna\n' ;;
     gpt-5.6-sol) printf 'sol\n' ;;
-    gpt-5.5) printf 'frontend\n' ;;
+    gpt-5.5) printf 'gpt-5.5\n' ;;
     *) printf 'custom\n' ;;
   esac
 }
@@ -256,8 +256,8 @@ PY
 case "${1:-}" in
   luna) TELEMETRY_MODE="luna"; TELEMETRY_ROUTE="$(telemetry_route "$LUNA_MODEL")"; TELEMETRY_EFFORT="high" ;;
   sol) TELEMETRY_MODE="sol"; TELEMETRY_ROUTE="$(telemetry_route "$SOL_MODEL")"; TELEMETRY_EFFORT="medium" ;;
-  frontend) TELEMETRY_MODE="frontend"; TELEMETRY_ROUTE="$(telemetry_route "$FRONTEND_MODEL")"; TELEMETRY_EFFORT="high" ;;
-  sol-review) TELEMETRY_MODE="sol-review"; TELEMETRY_ROUTE="$(telemetry_route "$SOL_MODEL")"; TELEMETRY_EFFORT="high" ;;
+  frontend) TELEMETRY_MODE="frontend"; TELEMETRY_ROUTE="frontend"; TELEMETRY_EFFORT="high" ;;
+  sol-review) TELEMETRY_MODE="sol-review"; TELEMETRY_ROUTE="$(telemetry_route "$SOL_MODEL")"; TELEMETRY_EFFORT="medium" ;;
   *) TELEMETRY_MODE="terra"; TELEMETRY_ROUTE="$(telemetry_route "$MODEL")"; TELEMETRY_EFFORT="$(effective_terra_effort "$@")" ;;
 esac
 TELEMETRY_AUTOCOMPACT="$(telemetry_autocompact "$AUTOCOMPACT")"
@@ -378,7 +378,7 @@ run_sol_review() {
   fi
   git worktree add --detach --quiet "$review_worktree_dir" "$review_commit" >/dev/null
   prompt="Review only the exact staged Git diff stored at $staged_diff_file for staged tree $staged_tree. Read that patch first, then inspect relevant repository files with read-only tools. Ignore unstaged and untracked changes. Return only valid JSON with this exact shape: {\"verdict\":\"PASS|CHANGES_REQUIRED|BLOCKED\",\"summary\":\"...\",\"findings\":[{\"severity\":\"high|medium|low\",\"file\":\"path or null\",\"line\":1,\"problem\":\"...\",\"failure_scenario\":\"...\",\"required_action\":\"... or null\"}],\"uncertainties\":[\"...\"]}. Use PASS only when no material correction is required."
-  (cd "$review_worktree_dir" && claude_command --agent claudex-sol-review --model "$SOL_MODEL" --effort high --permission-mode plan --autocompact "$AUTOCOMPACT" --print --output-format text "$prompt") >"$review_file"
+  (cd "$review_worktree_dir" && claude_command --agent claudex-sol-review --model "$SOL_MODEL" --effort medium --permission-mode plan --autocompact "$AUTOCOMPACT" --print --output-format text "$prompt") >"$review_file"
   current_tree="$(git write-tree)"
   if [[ "$current_tree" != "$staged_tree" ]]; then
     TELEMETRY_SOL_VERDICT=invalid

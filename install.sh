@@ -138,9 +138,9 @@ main() {
   login_codex
 
   printf '\nClaudex installed successfully.\n'
-  printf 'Default model: gpt-5.6-terra\n'
-  printf 'Default effort: high\n'
-  printf 'Installed agents: Terra coordinator, Luna data/research, Frontend implementer, Sol advisory, Sol Review gate\n'
+  printf 'Default model: gpt-5.5 (medium effort)\n'
+  printf 'Default effort: medium\n'
+  printf 'Installed agents: GPT-5.5 coordinator (Terra alias), Luna data/research, Frontend implementer, Sol advisory, Sol Review gate\n'
   printf 'Start it with: claudex\n'
   printf 'Verify dependencies with: claude --version && codex --version && cliproxyapi --help\n'
 }

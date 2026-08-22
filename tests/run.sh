@@ -20,18 +20,19 @@ test -f "$ROOT_DIR/agents/claudex-sol.md"
 test -f "$ROOT_DIR/agents/claudex-sol-review.md"
 test -f "$ROOT_DIR/agents/claudex-frontend.md"
 test -f "$ROOT_DIR/prompts/terra-routing.md"
-grep -Fq 'effort: high' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra must remain high effort'
+grep -Fq 'model: gpt-5.5' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Coordinator must use GPT-5.5'
+grep -Fq 'effort: medium' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Coordinator must use medium effort'
 grep -Fq 'effort: high' "$ROOT_DIR/agents/claudex-luna.md" || fail 'Luna must remain high effort'
 grep -Fq 'effort: medium' "$ROOT_DIR/agents/claudex-sol.md" || fail 'Sol advisory must use medium effort'
-grep -Fq 'effort: high' "$ROOT_DIR/agents/claudex-sol-review.md" || fail 'Sol Review must use high effort'
+grep -Fq 'effort: medium' "$ROOT_DIR/agents/claudex-sol-review.md" || fail 'Sol Review must use medium effort'
 grep -Fq 'model: gpt-5.5' "$ROOT_DIR/agents/claudex-frontend.md" || fail 'Frontend must use GPT-5.5'
 grep -Fq 'effort: high' "$ROOT_DIR/agents/claudex-frontend.md" || fail 'Frontend must use high effort'
 grep -Fq 'permissionMode: default' "$ROOT_DIR/agents/claudex-frontend.md" || fail 'Frontend must have implementation permissions'
 grep -Fq 'Do not change backend logic, schemas, contracts, authentication or authorization' "$ROOT_DIR/agents/claudex-frontend.md" || fail 'Frontend must retain its narrow write boundary'
 grep -Fq 'Do not monitor, infer lifecycle state, poll, resume, restart, steer, or inject continuation.' "$ROOT_DIR/agents/claudex-frontend.md" || fail 'Frontend must not introduce session supervision'
 grep -Fq 'medium effort for bounded architecture alternatives' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must define Sol as a medium-effort advisory'
-grep -Fq 'high-effort `claudex-sol-review` review before Terra approves the plan or starts implementation' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require high-effort Sol Review before consequential implementation'
-grep -Fq 'another independent high-effort `claudex-sol-review` review before Terra treats the change as complete or merge-ready' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require high-effort Sol Review before consequential completion'
+grep -Fq 'medium-effort `claudex-sol-review` review before the GPT-5.5 coordinator approves the plan or starts implementation' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require medium-effort Sol Review before consequential implementation'
+grep -Fq 'another independent medium-effort `claudex-sol-review` review before it treats the change as complete or merge-ready' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require medium-effort Sol Review before consequential completion'
 grep -Fq 'at most three concurrently' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must cap concurrent subagents at three'
 grep -Fq 'A generic planning agent is not a substitute for Sol review.' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must reject generic planning as a Sol substitute'
 grep -Fq 'Sol Review returns PASS, CHANGES_REQUIRED, or BLOCKED' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must reserve verdicts for Sol Review'
@@ -57,8 +58,8 @@ grep -Fq 'Before a resume can even be proposed' "$ROOT_DIR/docs/claude-code-supe
 ! grep -Fq 'session_id' "$ROOT_DIR/bin/claudex" || fail 'launcher must not persist session identifiers'
 ! grep -Fq 'hooks' "$ROOT_DIR/install.sh" || fail 'installer must not install lifecycle hooks'
 grep -Fq 'medium effort for bounded architecture alternatives' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must define Sol as a medium-effort advisory'
-grep -Fq 'high-effort `claudex-sol-review` review before you approve the plan or start implementation' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must require high-effort Sol Review before consequential implementation'
-grep -Fq 'another independent high-effort `claudex-sol-review` review before you treat the change as complete or merge-ready' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must require high-effort Sol Review before consequential completion'
+grep -Fq 'medium-effort `claudex-sol-review` review before you approve the plan or start implementation' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Coordinator agent must require medium-effort Sol Review before consequential implementation'
+grep -Fq 'another independent medium-effort `claudex-sol-review` review before you treat the change as complete or merge-ready' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Coordinator agent must require medium-effort Sol Review before consequential completion'
 grep -Fq 'Use `claudex-frontend` at high effort for a bounded, non-overlapping frontend change area' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must define bounded Frontend authority'
 grep -Fq 'Frontend implementation and tests never substitute for `claudex-sol-review`' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must retain Sol Review gates for Frontend work'
 grep -Fq 'maintain an in-context checklist of accepted outcomes' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must require in-context task tracking'
@@ -425,7 +426,7 @@ grep -Fxq 'default' "$FRONTEND_ARGS" || fail 'Frontend must use default permissi
 (cd "$REPO" && env "${CLAUDEX_TEST_ENV[@]}" MOCK_CLAUDE_ARGS_LOG="$SOL_REVIEW_ARGS" "$ROOT_DIR/bin/claudex" sol-review >/dev/null)
 grep -Fxq -- '--agent' "$SOL_REVIEW_ARGS" || fail 'Sol Review must select a custom agent'
 grep -Fxq 'claudex-sol-review' "$SOL_REVIEW_ARGS" || fail 'Sol Review must select claudex-sol-review'
-grep -Fxq 'high' "$SOL_REVIEW_ARGS" || fail 'Sol Review must use high effort'
+grep -Fxq 'medium' "$SOL_REVIEW_ARGS" || fail 'Sol Review must use medium effort'
 
 (cd "$REPO" && env "${CLAUDEX_TEST_ENV[@]}" CLAUDEX_TELEMETRY=1 "$ROOT_DIR/bin/claudex" frontend 'frontend telemetry secret' >/dev/null)
 (cd "$REPO" && env "${CLAUDEX_TEST_ENV[@]}" CLAUDEX_TELEMETRY=1 "$ROOT_DIR/bin/claudex" sol 'Sol telemetry fixture' >/dev/null)
@@ -438,7 +439,7 @@ sol = next(record for record in reversed(records) if record['event'] == 'launch_
 review = next(record for record in reversed(records) if record['event'] == 'launch_completed' and record['mode'] == 'sol-review')
 assert frontend['route'] == 'frontend' and frontend['effort'] == 'high', frontend
 assert sol['effort'] == 'medium', sol
-assert review['effort'] == 'high', review
+assert review['effort'] == 'medium', review
 assert 'frontend telemetry secret' not in open(sys.argv[1]).read()
 PY
 
