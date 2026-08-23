@@ -122,8 +122,16 @@ cmp -s "$ROOT_DIR/prompts/terra-routing.md" "$INSTALLED_PROMPT" || fail 'install
 for agent in claudex-terra claudex-luna claudex-frontend claudex-sol claudex-sol-review; do
   cmp -s "$ROOT_DIR/agents/$agent.md" "$INSTALLED_AGENT_HOME/$agent.md" || fail "install.sh must install $agent"
 done
+cmp -s "$ROOT_DIR/codex/AGENTS.md" "$INSTALL_HOME/.codex/AGENTS.md" || fail 'install.sh must install repo-backed Codex policy'
+cmp -s "$ROOT_DIR/codex/agents/claudex-luna.toml" "$INSTALL_HOME/.codex/agents/claudex-luna.toml" || fail 'install.sh must install repo-backed Codex agents'
+cmp -s "$ROOT_DIR/codex/skills/claudex-routing/SKILL.md" "$INSTALL_HOME/.codex/skills/claudex-routing/SKILL.md" || fail 'install.sh must install repo-backed Codex skills'
+cmp -s "$ROOT_DIR/codex/agents/claudex-sol-review.toml" "$INSTALL_HOME/Library/Application Support/orca/codex-runtime-home/home/agents/claudex-sol-review.toml" || fail 'install.sh must install repo-backed Orca Codex agents'
+grep -Fq 'max_threads = 3' "$INSTALL_HOME/.codex/config.toml" || fail 'install.sh must cap Codex subagent threads at three'
+grep -Fq 'max_threads = 3' "$INSTALL_HOME/Library/Application Support/orca/codex-runtime-home/home/config.toml" || fail 'install.sh must cap Orca Codex subagent threads at three'
 printf '%s\n' 'stale prompt' >"$INSTALLED_PROMPT"
 printf '%s\n' 'stale agent' >"$INSTALLED_AGENT_HOME/claudex-sol-review.md"
+printf '%s\n' 'stale codex policy' >"$INSTALL_HOME/.codex/AGENTS.md"
+printf '%s\n' 'stale orca agent' >"$INSTALL_HOME/Library/Application Support/orca/codex-runtime-home/home/agents/claudex-sol-review.toml"
 env \
   HOME="$INSTALL_HOME" \
   XDG_CONFIG_HOME="$INSTALL_XDG" \
@@ -135,6 +143,8 @@ cmp -s "$ROOT_DIR/prompts/terra-routing.md" "$INSTALLED_PROMPT" || fail 'install
 for agent in claudex-terra claudex-luna claudex-frontend claudex-sol claudex-sol-review; do
   cmp -s "$ROOT_DIR/agents/$agent.md" "$INSTALLED_AGENT_HOME/$agent.md" || fail "install.sh must refresh $agent on reinstall"
 done
+cmp -s "$ROOT_DIR/codex/AGENTS.md" "$INSTALL_HOME/.codex/AGENTS.md" || fail 'install.sh must refresh repo-backed Codex policy'
+cmp -s "$ROOT_DIR/codex/agents/claudex-sol-review.toml" "$INSTALL_HOME/Library/Application Support/orca/codex-runtime-home/home/agents/claudex-sol-review.toml" || fail 'install.sh must refresh repo-backed Orca Codex agents'
 printf '%s\n' 'sentinel routing prompt from installed file' >"$INSTALLED_PROMPT"
 rm -f "$CLAUDE_ARGS_LOG"
 env \

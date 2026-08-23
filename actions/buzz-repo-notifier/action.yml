@@ -1,0 +1,25 @@
+name: Buzz Repository Notifier
+description: Post issue, pull-request, and merge events from GitHub or Forgejo to a Buzz channel
+author: LorenzoTTGT
+
+branding:
+  icon: message-circle
+  color: purple
+
+inputs:
+  relay_url:
+    description: Buzz relay HTTP URL
+    required: true
+  channel_id:
+    description: Existing Buzz channel UUID. If omitted, the action finds or creates channel_name.
+    required: false
+  channel_name:
+    description: Buzz channel name to find or create when channel_id is omitted. Defaults to the repository full name.
+    required: false
+  private_key:
+    description: Private key for a dedicated low-privilege Buzz bot
+    required: true
+
+runs:
+  using: node20
+  main: dist/index.mjs

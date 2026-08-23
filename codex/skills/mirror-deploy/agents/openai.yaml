@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mirror Deploy"
+  short_description: "Deploy via mirror repo workflow"
+  default_prompt: "Use $mirror-deploy to commit and mirror-push for deployment."

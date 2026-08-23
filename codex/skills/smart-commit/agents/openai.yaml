@@ -1,0 +1,4 @@
+interface:
+  display_name: "Smart Commit"
+  short_description: "AI-assisted git commit workflow"
+  default_prompt: "Use $smart-commit to generate and push a structured commit message."

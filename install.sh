@@ -86,6 +86,8 @@ configure_claudex() {
   install -m 644 "$ROOT_DIR/agents/claudex-sol.md" "$AGENT_HOME/claudex-sol.md"
   install -m 644 "$ROOT_DIR/agents/claudex-sol-review.md" "$AGENT_HOME/claudex-sol-review.md"
   install -m 644 "$ROOT_DIR/agents/claudex-frontend.md" "$AGENT_HOME/claudex-frontend.md"
+
+  "$ROOT_DIR/scripts/sync-codex-orca.sh"
 }
 
 ensure_path() {

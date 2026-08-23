@@ -1,0 +1,25 @@
+name: Notify Buzz
+
+on:
+  push:
+    branches: [main]
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: LorenzoTTGT/buzz-repo-notifier@d45955af5a678b488571422499973a0717bf45d1
+        with:
+          relay_url: ${{ vars.BUZZ_RELAY_URL }}
+          channel_id: ${{ vars.BUZZ_CHANNEL_ID }}
+          channel_name: ${{ vars.BUZZ_CHANNEL_NAME }}
+          private_key: ${{ secrets.BUZZ_PRIVATE_KEY }}

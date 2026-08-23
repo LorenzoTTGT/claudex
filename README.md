@@ -32,7 +32,8 @@ The installer:
 6. Installs the `claudex` launcher to `~/.local/bin`.
 7. Installs the source-controlled Terra routing prompt to `~/.config/claudex/terra-routing.md`.
 8. Installs the five Claudex agent definitions to `~/.claude/agents`.
-9. Starts the Codex OAuth login when credentials are not already present.
+9. Installs the repo-backed Claudex-aligned Codex and Orca workflow config: global routing policy, subagents, skills, and a three-thread subagent cap.
+10. Starts the Codex OAuth login when credentials are not already present.
 
 Restart your shell after installation if `claudex` is not immediately found.
 
@@ -182,7 +183,15 @@ git pull
 ./install.sh --skip-login
 ```
 
-That reinstall step refreshes the installed Terra routing prompt and agent definitions from the repository sources.
+That reinstall step refreshes the installed Terra routing prompt, Claude Code agent definitions, and the Codex/Orca workflow config from the repository sources.
+
+Refresh only the Codex/Orca workflow config when needed:
+
+```bash
+./scripts/sync-codex-orca.sh
+```
+
+The sync copies `codex/AGENTS.md`, `codex/agents`, and `codex/skills` into `~/.codex` and Orca's isolated Codex runtime home, then enforces the Claudex three-subagent concurrency cap.
 
 Update dependencies separately when needed:
 
@@ -191,6 +200,13 @@ brew upgrade cliproxyapi
 brew upgrade --cask codex
 claude update
 ```
+
+## Repo-backed workflow assets
+
+This repository also backs up reusable local workflow assets:
+
+- `codex/` — Claudex-aligned Codex/Orca routing policy, subagents, and skills installed by `./scripts/sync-codex-orca.sh` and `./install.sh`.
+- `actions/buzz-repo-notifier/` — reusable Buzz repository notification GitHub/Forgejo action source and bundled `dist/` entry point.
 
 ## Security
 
