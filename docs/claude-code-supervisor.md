@@ -40,6 +40,8 @@ Claudex’s current `bin/claudex` launcher deliberately delegates session lifecy
 
 `CLAUDEX_TELEMETRY=1` is a narrow exception for content-free, invocation-scoped aggregate launcher accounting. It may record only the launcher’s direct child elapsed time and exit result plus proxy-start/readiness observations. Those fields are not evidence that a session completed or a proxy request succeeded, and telemetry must not inspect content, infer lifecycle state, poll, retry, resume, restart, or steer Claude Code.
 
+`claudex-usage-efficiency` is a separate, explicitly user-invoked retrospective accounting tool. It may read Codex's current account quota window through the local app-server `account/rateLimits/read` method and local Codex/Orca-Codex SQLite turn-duration timestamps, then append only aggregate quota-window, cumulative-percent, merged active-duration, and revision fields to a private local JSONL file. It must not install hooks, run continuously, poll, watch processes, persist session/thread IDs, store intervals, read prompts or transcripts, infer lifecycle state, retry work, resume, restart, steer, or send data externally.
+
 The source-controlled [Terra routing policy](../prompts/terra-routing.md) requires the following boundary for all current and future work:
 
 - Do not treat hook events, local agent view state, silence, or a short final summary as proof that a session is dead.

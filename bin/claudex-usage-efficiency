@@ -1,0 +1,558 @@
+#!/usr/bin/env python3
+"""Record and report local, content-free Codex usage-efficiency snapshots."""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import errno
+import fcntl
+import json
+import math
+import os
+import select
+import stat
+import sqlite3
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+FORMAT_VERSION = 1
+METRIC_REVISION = "usage-efficiency-v1"
+MAX_STORE_BYTES = 5 * 1024 * 1024
+SECONDS_PER_HOUR = 3600.0
+DEFAULT_CODEX_HOME = Path.home() / ".codex"
+DEFAULT_ORCA_CODEX_HOME = Path.home() / "Library/Application Support/orca/codex-runtime-home/home"
+SUPPORTED_THREAD_TURNS_COLUMNS = {
+    "thread_id",
+    "turn_id",
+    "rollout_ordinal",
+    "status",
+    "error_json",
+    "started_at",
+    "completed_at",
+    "duration_ms",
+    "first_user_item_id",
+    "final_agent_item_id",
+    "rollout_byte_offset",
+    "rollout_end_ordinal",
+    "rollout_end_byte_offset",
+}
+
+
+class UsageError(Exception):
+    pass
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Record/report content-free weekly Codex usage per active coding hour."
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    snapshot = subparsers.add_parser("snapshot", help="Append one usage-efficiency snapshot")
+    snapshot.add_argument("--percent-used", type=float, help="Manual cumulative Codex percent used")
+    snapshot.add_argument("--reset-at", help="Manual quota reset timestamp (epoch seconds or ISO-8601)")
+    snapshot.add_argument("--window-minutes", type=int, help="Manual quota window duration in minutes")
+    snapshot.add_argument("--no-auto-rate-limit", action="store_true", help="Do not query Codex app-server")
+    snapshot.add_argument("--output", help="Override the JSONL store path")
+    snapshot.add_argument("--json", action="store_true", help="Print the snapshot as JSON")
+
+    report = subparsers.add_parser("report", help="Report comparable snapshot deltas")
+    report.add_argument("--output", help="Override the JSONL store path")
+    report.add_argument("--json", action="store_true", help="Print report data as JSON")
+
+    args = parser.parse_args()
+    try:
+        if args.command == "snapshot":
+            value = record_snapshot(args)
+            if args.json:
+                print(json.dumps(value, indent=2, sort_keys=True))
+            else:
+                print(format_snapshot(value))
+            return 0
+        value = build_report(store_path(args.output))
+        if args.json:
+            print(json.dumps(value, indent=2, sort_keys=True))
+        else:
+            print(format_report(value))
+        return 0
+    except UsageError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+
+def record_snapshot(args: argparse.Namespace) -> dict[str, Any]:
+    rate = None if args.no_auto_rate_limit else read_codex_rate_limit()
+    if rate is None:
+        rate = manual_rate_limit(args)
+    elif args.percent_used is not None or args.reset_at is not None or args.window_minutes is not None:
+        raise UsageError("do not mix automatic rate-limit reads with manual --percent-used/--reset-at/--window-minutes")
+
+    week_start = int(rate["resets_at"] - rate["window_duration_mins"] * 60)
+    week_end = int(rate["resets_at"])
+    if week_start >= week_end:
+        raise UsageError("quota window start must be before reset time")
+
+    intervals, source_counts = collect_intervals(week_start, week_end)
+    active_seconds = merged_duration_seconds(intervals)
+    active_hours = active_seconds / SECONDS_PER_HOUR
+    percent_used = float(rate["used_percent"])
+    percent_per_hour = None if active_hours == 0 else percent_used / active_hours
+
+    snapshot = {
+        "format_version": FORMAT_VERSION,
+        "metric_revision": METRIC_REVISION,
+        "source_revision": source_revision(),
+        "recorded_at": utc_now_iso(),
+        "quota_window_start": epoch_to_iso(week_start),
+        "quota_window_end": epoch_to_iso(week_end),
+        "quota_window_start_unix": week_start,
+        "quota_window_end_unix": week_end,
+        "percent_used": round(percent_used, 6),
+        "active_hours": round(active_hours, 6),
+        "active_seconds": int(round(active_seconds)),
+        "percent_per_active_hour": None if percent_per_hour is None else round(percent_per_hour, 6),
+        "rate_limit_source": rate["source"],
+        "rate_limit_id": rate.get("limit_id") or "codex",
+        "db_source_counts": source_counts,
+        "interval_count": len(intervals),
+    }
+    validate_snapshot(snapshot)
+    append_snapshot(store_path(args.output), snapshot)
+    return snapshot
+
+
+def read_codex_rate_limit() -> dict[str, Any] | None:
+    request = {
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "clientInfo": {"name": "claudex-usage-efficiency", "version": str(FORMAT_VERSION)},
+            "capabilities": {"experimentalApi": True, "optOutNotificationMethods": []},
+        },
+    }
+    rate_request = {"id": 2, "method": "account/rateLimits/read", "params": None}
+    try:
+        proc = subprocess.Popen(
+            ["codex", "app-server", "--stdio"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            bufsize=1,
+        )
+    except FileNotFoundError:
+        return None
+    try:
+        write_jsonrpc(proc, request)
+        if read_jsonrpc_response(proc, 1, timeout_seconds=10) is None:
+            return None
+        write_jsonrpc(proc, rate_request)
+        response = read_jsonrpc_response(proc, 2, timeout_seconds=30)
+        if not response or "result" not in response:
+            return None
+        return parse_rate_limit_response(response["result"])
+    finally:
+        try:
+            if proc.stdin:
+                proc.stdin.close()
+        except BrokenPipeError:
+            pass
+        try:
+            proc.terminate()
+        except ProcessLookupError:
+            pass
+        try:
+            proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
+def write_jsonrpc(proc: subprocess.Popen[str], message: dict[str, Any]) -> None:
+    if proc.stdin is None:
+        raise UsageError("Codex app-server stdin was unavailable")
+    proc.stdin.write(json.dumps(message, separators=(",", ":")) + "\n")
+    proc.stdin.flush()
+
+
+def read_jsonrpc_response(proc: subprocess.Popen[str], response_id: int, timeout_seconds: int) -> dict[str, Any] | None:
+    if proc.stdout is None:
+        return None
+    deadline = dt.datetime.now(dt.timezone.utc).timestamp() + timeout_seconds
+    while dt.datetime.now(dt.timezone.utc).timestamp() < deadline:
+        remaining = max(0.0, deadline - dt.datetime.now(dt.timezone.utc).timestamp())
+        readable, _, _ = select.select([proc.stdout], [], [], min(0.25, remaining))
+        if not readable:
+            if proc.poll() is not None:
+                return None
+            continue
+        line = proc.stdout.readline()
+        if not line:
+            return None
+        try:
+            message = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if message.get("id") == response_id:
+            return message
+    return None
+
+
+def parse_rate_limit_response(result: dict[str, Any]) -> dict[str, Any]:
+    selected = None
+    by_id = result.get("rateLimitsByLimitId")
+    if isinstance(by_id, dict) and isinstance(by_id.get("codex"), dict):
+        selected = by_id["codex"]
+    elif isinstance(result.get("rateLimits"), dict):
+        selected = result["rateLimits"]
+    if not selected:
+        raise UsageError("Codex rate-limit response did not include a codex bucket")
+    limit_id = selected.get("limitId")
+    if limit_id not in (None, "codex"):
+        raise UsageError("Codex rate-limit response selected a non-codex bucket")
+    primary = selected.get("primary")
+    if not isinstance(primary, dict):
+        raise UsageError("Codex rate-limit response did not include a primary quota window")
+    used = primary.get("usedPercent")
+    window = primary.get("windowDurationMins")
+    resets = primary.get("resetsAt")
+    if not is_finite_number(used) or not (0 <= float(used) <= 1000):
+        raise UsageError("Codex rate-limit usedPercent was missing or invalid")
+    if not isinstance(window, int) or window <= 0:
+        raise UsageError("Codex rate-limit windowDurationMins was missing or invalid")
+    if not isinstance(resets, int) or resets <= 0:
+        raise UsageError("Codex rate-limit resetsAt was missing or invalid")
+    return {
+        "source": "codex_app_server_account_rateLimits_read",
+        "limit_id": selected.get("limitId") or "codex",
+        "used_percent": float(used),
+        "window_duration_mins": window,
+        "resets_at": resets,
+    }
+
+
+def manual_rate_limit(args: argparse.Namespace) -> dict[str, Any]:
+    if args.percent_used is None or args.reset_at is None or args.window_minutes is None:
+        raise UsageError(
+            "automatic Codex rate-limit read was unavailable; rerun with --percent-used, --reset-at, and --window-minutes"
+        )
+    if not is_finite_number(args.percent_used) or not (0 <= args.percent_used <= 1000):
+        raise UsageError("--percent-used must be a finite number between 0 and 1000")
+    if args.window_minutes <= 0:
+        raise UsageError("--window-minutes must be positive")
+    return {
+        "source": "manual_cli_args",
+        "limit_id": "codex",
+        "used_percent": float(args.percent_used),
+        "window_duration_mins": int(args.window_minutes),
+        "resets_at": parse_time(args.reset_at),
+    }
+
+
+def collect_intervals(window_start: int, window_end: int) -> tuple[list[tuple[float, float]], dict[str, int]]:
+    homes: list[tuple[str, Path]] = [("codex", Path(os.environ.get("CODEX_HOME", DEFAULT_CODEX_HOME)))]
+    if os.environ.get("CLAUDEX_USAGE_INCLUDE_ORCA", "1") != "0":
+        homes.append(("orca", Path(os.environ.get("ORCA_CODEX_HOME", DEFAULT_ORCA_CODEX_HOME))))
+    intervals: list[tuple[float, float]] = []
+    counts: dict[str, int] = {}
+    for name, home in homes:
+        db = home / "thread_history_1.sqlite"
+        try:
+            db_stat = db.lstat()
+        except FileNotFoundError:
+            counts[name] = 0
+            continue
+        if stat.S_ISLNK(db_stat.st_mode) or not stat.S_ISREG(db_stat.st_mode):
+            raise UsageError("Codex thread history database must be a regular non-symlink file")
+        source_intervals = read_thread_turn_intervals(db, window_start, window_end)
+        counts[name] = len(source_intervals)
+        intervals.extend(source_intervals)
+    return intervals, counts
+
+
+def read_thread_turn_intervals(db_path: Path, window_start: int, window_end: int) -> list[tuple[float, float]]:
+    uri = f"file:{db_path}?mode=ro"
+    try:
+        con = sqlite3.connect(uri, uri=True)
+    except sqlite3.Error as exc:
+        raise UsageError("could not open a supported Codex thread history database read-only") from exc
+    try:
+        columns = {row[1] for row in con.execute("PRAGMA table_info(thread_turns)")}
+        if not SUPPORTED_THREAD_TURNS_COLUMNS.issubset(columns):
+            raise UsageError("unsupported Codex thread_turns schema")
+        rows = con.execute(
+            """
+            SELECT started_at, completed_at, duration_ms
+            FROM thread_turns
+            WHERE started_at IS NOT NULL
+              AND (completed_at IS NOT NULL OR duration_ms IS NOT NULL)
+            """
+        ).fetchall()
+    except sqlite3.Error as exc:
+        raise UsageError("failed to read Codex thread turn timestamps") from exc
+    finally:
+        con.close()
+
+    intervals: list[tuple[float, float]] = []
+    for started_at, completed_at, duration_ms in rows:
+        if not isinstance(started_at, int) or started_at <= 0:
+            raise UsageError("malformed Codex turn timestamp encountered")
+        start = float(started_at)
+        if completed_at is not None and isinstance(completed_at, int) and completed_at > started_at:
+            end = float(completed_at)
+        elif isinstance(duration_ms, int) and duration_ms > 0:
+            end = float(started_at) + (duration_ms / 1000.0)
+        else:
+            raise UsageError("malformed Codex turn interval encountered")
+        if end <= start:
+            raise UsageError("malformed Codex turn interval encountered")
+        if end <= window_start or start >= window_end:
+            continue
+        intervals.append((max(start, float(window_start)), min(end, float(window_end))))
+    return intervals
+
+
+def merged_duration_seconds(intervals: list[tuple[float, float]]) -> float:
+    if not intervals:
+        return 0.0
+    total = 0.0
+    sorted_intervals = sorted(intervals)
+    cur_start, cur_end = sorted_intervals[0]
+    for start, end in sorted_intervals[1:]:
+        if start <= cur_end:
+            cur_end = max(cur_end, end)
+        else:
+            total += cur_end - cur_start
+            cur_start, cur_end = start, end
+    total += cur_end - cur_start
+    return total
+
+
+def append_snapshot(path: Path, snapshot: dict[str, Any]) -> None:
+    ensure_private_parent(path)
+    flags = os.O_CREAT | os.O_RDWR | os.O_APPEND
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        fd = os.open(path, flags, 0o600)
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise UsageError("refusing to write usage store through a symlink") from exc
+        raise
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            raise UsageError("usage store must be a regular file")
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "r+", encoding="utf-8") as handle:
+            fd = -1
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            trim_store_if_needed(handle)
+            handle.seek(0, os.SEEK_END)
+            handle.write(json.dumps(snapshot, sort_keys=True, separators=(",", ":")) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
+def trim_store_if_needed(handle: Any) -> None:
+    handle.seek(0, os.SEEK_END)
+    size = handle.tell()
+    if size <= MAX_STORE_BYTES:
+        return
+    keep = MAX_STORE_BYTES // 2
+    handle.seek(max(0, size - keep))
+    data = handle.read()
+    first_newline = data.find("\n")
+    if first_newline >= 0:
+        data = data[first_newline + 1 :]
+    handle.seek(0)
+    handle.truncate(0)
+    handle.write(data)
+    handle.flush()
+
+
+def build_report(path: Path) -> dict[str, Any]:
+    snapshots = read_snapshots(path)
+    comparable = []
+    non_comparable = []
+    for previous, current in zip(snapshots, snapshots[1:]):
+        reason = comparability_reason(previous, current)
+        if reason:
+            non_comparable.append({"from": previous["recorded_at"], "to": current["recorded_at"], "reason": reason})
+            continue
+        delta_hours = current["active_hours"] - previous["active_hours"]
+        delta_percent = current["percent_used"] - previous["percent_used"]
+        if delta_hours == 0:
+            non_comparable.append({"from": previous["recorded_at"], "to": current["recorded_at"], "reason": "zero active-hour delta"})
+            continue
+        comparable.append({
+            "from": previous["recorded_at"],
+            "to": current["recorded_at"],
+            "quota_window_start": current["quota_window_start"],
+            "quota_window_end": current["quota_window_end"],
+            "delta_percent_used": round(delta_percent, 6),
+            "delta_active_hours": round(delta_hours, 6),
+            "delta_percent_per_active_hour": round(delta_percent / delta_hours, 6),
+        })
+    return {"snapshot_count": len(snapshots), "comparable_deltas": comparable, "non_comparable_deltas": non_comparable}
+
+
+def read_snapshots(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    st = path.lstat()
+    if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
+        raise UsageError("usage store must be a regular non-symlink file")
+    snapshots = []
+    with path.open("r", encoding="utf-8") as handle:
+        for number, line in enumerate(handle, 1):
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise UsageError(f"usage store contains invalid JSON on line {number}") from exc
+            validate_snapshot(value)
+            snapshots.append(value)
+    return snapshots
+
+
+def comparability_reason(previous: dict[str, Any], current: dict[str, Any]) -> str | None:
+    keys = ["format_version", "metric_revision", "source_revision", "quota_window_start_unix", "quota_window_end_unix"]
+    for key in keys:
+        if previous.get(key) != current.get(key):
+            return f"different {key}"
+    if current["percent_used"] < previous["percent_used"]:
+        return "percent_used decreased"
+    if current["active_hours"] < previous["active_hours"]:
+        return "active_hours decreased"
+    return None
+
+
+def validate_snapshot(value: dict[str, Any]) -> None:
+    allowed = {
+        "format_version", "metric_revision", "source_revision", "recorded_at",
+        "quota_window_start", "quota_window_end", "quota_window_start_unix", "quota_window_end_unix",
+        "percent_used", "active_hours", "active_seconds", "percent_per_active_hour",
+        "rate_limit_source", "rate_limit_id", "db_source_counts", "interval_count",
+    }
+    if set(value) != allowed:
+        raise UsageError("snapshot contains unsupported fields")
+    if value["format_version"] != FORMAT_VERSION or value["metric_revision"] != METRIC_REVISION:
+        raise UsageError("unsupported snapshot format")
+    for key in ["percent_used", "active_hours"]:
+        if not is_finite_number(value[key]) or value[key] < 0:
+            raise UsageError(f"invalid {key}")
+    if value["percent_used"] > 1000:
+        raise UsageError("invalid percent_used")
+    if value["percent_per_active_hour"] is not None and not is_finite_number(value["percent_per_active_hour"]):
+        raise UsageError("invalid percent_per_active_hour")
+    if not isinstance(value["active_seconds"], int) or value["active_seconds"] < 0:
+        raise UsageError("invalid active_seconds")
+    if not isinstance(value["interval_count"], int) or value["interval_count"] < 0:
+        raise UsageError("invalid interval_count")
+    if not isinstance(value["db_source_counts"], dict) or set(value["db_source_counts"]) - {"codex", "orca"}:
+        raise UsageError("invalid db_source_counts")
+    if not isinstance(value["quota_window_start_unix"], int) or not isinstance(value["quota_window_end_unix"], int):
+        raise UsageError("invalid quota window")
+    if value["quota_window_start_unix"] >= value["quota_window_end_unix"]:
+        raise UsageError("invalid quota window")
+
+
+def store_path(override: str | None) -> Path:
+    if override:
+        return Path(override).expanduser()
+    state_home = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state"))
+    return state_home / "claudex/usage/efficiency.jsonl"
+
+
+def ensure_private_parent(path: Path) -> None:
+    parent = path.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    current = parent
+    target_root = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")).expanduser()
+    try:
+        current.chmod(0o700)
+        if parent.is_relative_to(target_root):
+            probe = parent
+            while probe != target_root.parent and str(probe) != "/":
+                if probe.exists():
+                    probe.chmod(0o700)
+                if probe == target_root:
+                    break
+                probe = probe.parent
+    except PermissionError:
+        raise UsageError("could not enforce private permissions on usage directory")
+
+
+def parse_time(value: str) -> int:
+    try:
+        return int(value)
+    except ValueError:
+        pass
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = dt.datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise UsageError("timestamp must be epoch seconds or ISO-8601") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return int(parsed.timestamp())
+
+
+def epoch_to_iso(value: int) -> str:
+    return dt.datetime.fromtimestamp(value, dt.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def utc_now_iso() -> str:
+    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def source_revision() -> str:
+    root = Path(__file__).resolve().parents[1]
+    try:
+        proc = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=5, check=True)
+        value = proc.stdout.strip()
+        return value if value else "unknown"
+    except Exception:
+        return "unknown"
+
+
+def is_finite_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value))
+
+
+def format_snapshot(value: dict[str, Any]) -> str:
+    rate = "n/a" if value["percent_per_active_hour"] is None else f"{value['percent_per_active_hour']:.3f}%/active hour"
+    return "\n".join([
+        "Recorded Codex usage-efficiency snapshot.",
+        f"Quota window: {value['quota_window_start']} to {value['quota_window_end']}",
+        f"Usage: {value['percent_used']:.2f}% over {value['active_hours']:.2f} active hours ({rate})",
+        f"Rate-limit source: {value['rate_limit_source']}",
+    ])
+
+
+def format_report(value: dict[str, Any]) -> str:
+    lines = [f"Snapshots: {value['snapshot_count']}"]
+    if value["comparable_deltas"]:
+        lines.append("Comparable deltas:")
+        for delta in value["comparable_deltas"]:
+            lines.append(
+                f"- {delta['from']} → {delta['to']}: {delta['delta_percent_used']:.2f}% / "
+                f"{delta['delta_active_hours']:.2f}h = {delta['delta_percent_per_active_hour']:.3f}%/active hour"
+            )
+    else:
+        lines.append("Comparable deltas: none")
+    if value["non_comparable_deltas"]:
+        lines.append("Non-comparable deltas:")
+        for delta in value["non_comparable_deltas"]:
+            lines.append(f"- {delta['from']} → {delta['to']}: {delta['reason']}")
+    return "\n".join(lines)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

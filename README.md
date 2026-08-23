@@ -29,7 +29,7 @@ The installer:
 3. Installs Claude Code using Anthropic's official native installer when it is not found.
 4. Installs the OpenAI Codex CLI using Homebrew, with an npm fallback, when it is not found.
 5. Generates a unique local proxy token.
-6. Installs the `claudex` launcher to `~/.local/bin`.
+6. Installs the `claudex` launcher and local utility commands to `~/.local/bin`.
 7. Installs the source-controlled Terra routing prompt to `~/.config/claudex/terra-routing.md`.
 8. Installs the five Claudex agent definitions to `~/.claude/agents`.
 9. Installs the repo-backed Claudex-aligned Codex and Orca workflow config: global routing policy, subagents, skills, and a three-thread subagent cap.
@@ -156,6 +156,25 @@ CLAUDEX_SKIP_PERMISSIONS=0 claudex
 ```
 
 `CLAUDEX_SKIP_PERMISSIONS=1` weakens Claude Code permission enforcement. Use `CLAUDEX_SKIP_PERMISSIONS=0` with Luna or Sol if you need their read-only guarantees enforced by the client; their definitions also prohibit mutations in their instructions.
+
+### Local usage-efficiency snapshots
+
+Run `claudex-usage-efficiency snapshot` to append a local-only, content-free snapshot of current Codex weekly usage percent per active coding hour. The command first queries Codex's app-server `account/rateLimits/read` method for the account's current `codex` quota bucket, including the authoritative reset time and window duration, then clips local Codex and Orca-Codex turn-duration records to that exact quota window.
+
+```bash
+claudex-usage-efficiency snapshot
+claudex-usage-efficiency report
+```
+
+If Codex's app-server is unavailable, provide the same quota data manually:
+
+```bash
+claudex-usage-efficiency snapshot --no-auto-rate-limit --percent-used 73 --reset-at 2026-08-28T11:30:16Z --window-minutes 10080
+```
+
+Snapshots are appended to `${XDG_STATE_HOME:-~/.local/state}/claudex/usage/efficiency.jsonl` with private directory/file permissions. Records contain only aggregate quota-window timestamps, cumulative percent used, merged active seconds/hours, derived percent per active hour, source revisions, and aggregate source counts. They do not contain prompts, transcripts, repositories, raw database paths, session IDs, thread IDs, intervals, credentials, or environment values. Report mode compares only snapshots from the same quota window with compatible format/source revisions and nondecreasing cumulative percent/hours; resets, pruned source data, zero-hour deltas, and incompatible revisions are reported as non-comparable rather than as efficiency changes.
+
+This is retrospective, explicitly user-invoked accounting. It does not install hooks, poll, watch processes, infer lifecycle state, resume, restart, steer, or send data externally.
 
 ### Local launcher telemetry
 

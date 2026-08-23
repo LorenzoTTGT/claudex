@@ -90,6 +90,96 @@ grep -Fq 'Do not let review feedback expand the change beyond the delegated goal
 grep -Fq 'carries available investigation, implementation, validation, and integration steps through to completion' "$ROOT_DIR/README.md" || fail 'README must document same-session execution'
 grep -Fq 'limits the requested scope; Terra still completes that requested analysis or checkpoint with the available evidence' "$ROOT_DIR/README.md" || fail 'README must describe complete limited-scope work'
 grep -Fq 'not lifecycle automation: it adds no hooks, polling, process watching, task/session persistence, automatic resume/restart, session selection, or synthetic continuation' "$ROOT_DIR/README.md" || fail 'README must distinguish completion discipline from session supervision'
+grep -Fq 'account/rateLimits/read' "$ROOT_DIR/README.md" || fail 'README must document automatic Codex usage percentage reads'
+grep -Fq 'explicitly user-invoked retrospective usage-efficiency snapshots' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must authorize only narrow usage-efficiency accounting'
+grep -Fq 'claudex-usage-efficiency` is a separate, explicitly user-invoked retrospective accounting tool' "$ROOT_DIR/docs/claude-code-supervisor.md" || fail 'supervision docs must authorize the usage-efficiency boundary'
+python3 - "$ROOT_DIR/bin/claudex-usage-efficiency" "$TMP_DIR/claudex-usage-efficiency.pyc" <<'PY'
+import py_compile, sys
+py_compile.compile(sys.argv[1], cfile=sys.argv[2], doraise=True)
+PY
+
+USAGE_HOME="$TMP_DIR/usage-home"
+USAGE_ORCA="$TMP_DIR/usage-orca"
+USAGE_BIN="$TMP_DIR/usage-bin"
+USAGE_STATE="$TMP_DIR/usage-state"
+mkdir -p "$USAGE_HOME" "$USAGE_ORCA" "$USAGE_BIN" "$USAGE_STATE"
+python3 - "$USAGE_HOME/thread_history_1.sqlite" "$USAGE_ORCA/thread_history_1.sqlite" <<'PY'
+import sqlite3, sys
+schema = """
+CREATE TABLE thread_turns (
+    thread_id TEXT NOT NULL,
+    turn_id TEXT NOT NULL,
+    rollout_ordinal INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    error_json TEXT,
+    started_at INTEGER,
+    completed_at INTEGER,
+    duration_ms INTEGER,
+    first_user_item_id TEXT,
+    final_agent_item_id TEXT,
+    rollout_byte_offset INTEGER,
+    rollout_end_ordinal INTEGER,
+    rollout_end_byte_offset INTEGER,
+    PRIMARY KEY (thread_id, turn_id)
+)
+"""
+for path, start, end in [(sys.argv[1], 1700003600, 1700007200), (sys.argv[2], 1700005400, 1700009000)]:
+    con = sqlite3.connect(path)
+    con.executescript(schema)
+    con.execute("INSERT INTO thread_turns (thread_id, turn_id, rollout_ordinal, status, started_at, completed_at, duration_ms) VALUES ('thread', 'turn', 1, 'completed', ?, ?, ?)", (start, end, (end - start) * 1000))
+    con.commit()
+    con.close()
+PY
+cat >"$USAGE_BIN/codex" <<'EOF'
+#!/usr/bin/env python3
+import json, sys
+for line in sys.stdin:
+    message = json.loads(line)
+    if message.get("id") == 1:
+        print(json.dumps({"id": 1, "result": {"userAgent": "test", "codexHome": "/tmp/test", "platformFamily": "unix", "platformOs": "macos"}}), flush=True)
+    elif message.get("id") == 2:
+        print(json.dumps({"id": 2, "result": {"rateLimits": {"limitId": "other", "primary": {"usedPercent": 99, "windowDurationMins": 10080, "resetsAt": 1700604800}}, "rateLimitsByLimitId": {"codex": {"limitId": "codex", "primary": {"usedPercent": 15, "windowDurationMins": 10080, "resetsAt": 1700604800}}}}}), flush=True)
+EOF
+chmod 755 "$USAGE_BIN/codex"
+env PATH="$USAGE_BIN:$PATH" CODEX_HOME="$USAGE_HOME" ORCA_CODEX_HOME="$USAGE_ORCA" XDG_STATE_HOME="$USAGE_STATE" "$ROOT_DIR/bin/claudex-usage-efficiency" snapshot --json >"$TMP_DIR/usage-snapshot.json"
+python3 - "$TMP_DIR/usage-snapshot.json" "$USAGE_STATE/claudex/usage/efficiency.jsonl" <<'PY'
+import json, os, stat, sys
+snapshot = json.load(open(sys.argv[1]))
+store = sys.argv[2]
+assert snapshot["percent_used"] == 15, snapshot
+assert snapshot["quota_window_start_unix"] == 1700000000, snapshot
+assert snapshot["quota_window_end_unix"] == 1700604800, snapshot
+assert snapshot["active_seconds"] == 5400, snapshot
+assert snapshot["active_hours"] == 1.5, snapshot
+assert snapshot["percent_per_active_hour"] == 10, snapshot
+assert snapshot["db_source_counts"] == {"codex": 1, "orca": 1}, snapshot
+assert snapshot["rate_limit_source"] == "codex_app_server_account_rateLimits_read", snapshot
+mode = stat.S_IMODE(os.stat(store).st_mode)
+assert mode == 0o600, oct(mode)
+assert len(open(store).read().splitlines()) == 1
+for forbidden in ["thread", "turn", sys.argv[1], os.environ.get("HOME", "")]:
+    if forbidden:
+        assert forbidden not in open(store).read(), forbidden
+PY
+USAGE_LINK_HOME="$TMP_DIR/usage-link-home"
+mkdir -p "$USAGE_LINK_HOME"
+ln -s "$USAGE_HOME/thread_history_1.sqlite" "$USAGE_LINK_HOME/thread_history_1.sqlite"
+expect_fail env CODEX_HOME="$USAGE_LINK_HOME" CLAUDEX_USAGE_INCLUDE_ORCA=0 XDG_STATE_HOME="$TMP_DIR/usage-link-state" "$ROOT_DIR/bin/claudex-usage-efficiency" snapshot --no-auto-rate-limit --percent-used 1 --reset-at 1700604800 --window-minutes 10080
+USAGE_DIRECTORY_DB_HOME="$TMP_DIR/usage-directory-db-home"
+mkdir -p "$USAGE_DIRECTORY_DB_HOME/thread_history_1.sqlite"
+expect_fail env CODEX_HOME="$USAGE_DIRECTORY_DB_HOME" CLAUDEX_USAGE_INCLUDE_ORCA=0 XDG_STATE_HOME="$TMP_DIR/usage-directory-db-state" "$ROOT_DIR/bin/claudex-usage-efficiency" snapshot --no-auto-rate-limit --percent-used 1 --reset-at 1700604800 --window-minutes 10080
+cat >"$USAGE_BIN/codex" <<'EOF'
+#!/usr/bin/env python3
+import json, sys
+for line in sys.stdin:
+    message = json.loads(line)
+    if message.get("id") == 1:
+        print(json.dumps({"id": 1, "result": {"userAgent": "test", "codexHome": "/tmp/test", "platformFamily": "unix", "platformOs": "macos"}}), flush=True)
+    elif message.get("id") == 2:
+        print(json.dumps({"id": 2, "result": {"rateLimits": {"limitId": "other", "primary": {"usedPercent": 15, "windowDurationMins": 10080, "resetsAt": 1700604800}}}}), flush=True)
+EOF
+chmod 755 "$USAGE_BIN/codex"
+expect_fail env PATH="$USAGE_BIN:$PATH" CODEX_HOME="$USAGE_HOME" CLAUDEX_USAGE_INCLUDE_ORCA=0 XDG_STATE_HOME="$TMP_DIR/usage-wrong-bucket-state" "$ROOT_DIR/bin/claudex-usage-efficiency" snapshot
 
 INSTALL_HOME="$TMP_DIR/install-home"
 INSTALL_XDG="$TMP_DIR/install-xdg"
@@ -122,6 +212,7 @@ cmp -s "$ROOT_DIR/prompts/terra-routing.md" "$INSTALLED_PROMPT" || fail 'install
 for agent in claudex-terra claudex-luna claudex-frontend claudex-sol claudex-sol-review; do
   cmp -s "$ROOT_DIR/agents/$agent.md" "$INSTALLED_AGENT_HOME/$agent.md" || fail "install.sh must install $agent"
 done
+test -x "$INSTALL_HOME/.local/bin/claudex-usage-efficiency" || fail 'install.sh must install the usage-efficiency utility'
 cmp -s "$ROOT_DIR/codex/AGENTS.md" "$INSTALL_HOME/.codex/AGENTS.md" || fail 'install.sh must install repo-backed Codex policy'
 cmp -s "$ROOT_DIR/codex/agents/claudex-luna.toml" "$INSTALL_HOME/.codex/agents/claudex-luna.toml" || fail 'install.sh must install repo-backed Codex agents'
 cmp -s "$ROOT_DIR/codex/skills/claudex-routing/SKILL.md" "$INSTALL_HOME/.codex/skills/claudex-routing/SKILL.md" || fail 'install.sh must install repo-backed Codex skills'
