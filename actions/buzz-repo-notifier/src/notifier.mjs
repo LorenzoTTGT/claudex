@@ -86,7 +86,7 @@ export function buildMessage(eventName, event, fallbackRepository) {
     ].filter(Boolean).join("\n");
   }
 
-  if (eventName === "pull_request" && action === "opened" && event.pull_request) {
+  if ((eventName === "pull_request" || eventName === "pull_request_target") && action === "opened" && event.pull_request) {
     const pull = event.pull_request;
     return [
       `New pull request in ${repository}: ${pull.title}`,

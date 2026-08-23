@@ -67,6 +67,7 @@ test("formats opened pull requests but skips closes and merges", () => {
   };
 
   assert.match(buildMessage("pull_request", { action: "opened", pull_request: pull }, "acme/music"), /New pull request in acme\/music: Add catalogue/);
+  assert.match(buildMessage("pull_request_target", { action: "opened", pull_request: pull }, "acme/music"), /New pull request in acme\/music: Add catalogue/);
   assert.equal(buildMessage("pull_request", { action: "closed", pull_request: pull }, "acme/music"), null);
   assert.equal(
     buildMessage("pull_request", {
