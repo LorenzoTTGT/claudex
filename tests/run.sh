@@ -13,13 +13,25 @@ expect_fail() {
   fi
 }
 
-bash -n "$ROOT_DIR/bin/claudex" "$ROOT_DIR/bin/claudex-review-receipt" "$ROOT_DIR/install.sh"
+bash -n "$ROOT_DIR/bin/claudex" "$ROOT_DIR/bin/claudex-review-receipt" "$ROOT_DIR/install.sh" "$ROOT_DIR/scripts/sync-codex-orca.sh" "$ROOT_DIR/scripts/verify-install.sh" "$ROOT_DIR/scripts/uninstall.sh"
+python3 - "$ROOT_DIR/scripts/install-state.py" "$TMP_DIR/install-state.pyc" <<'PY'
+import py_compile, sys
+py_compile.compile(sys.argv[1], cfile=sys.argv[2], doraise=True)
+PY
 test -f "$ROOT_DIR/agents/claudex-terra.md"
 test -f "$ROOT_DIR/agents/claudex-luna.md"
 test -f "$ROOT_DIR/agents/claudex-sol.md"
 test -f "$ROOT_DIR/agents/claudex-sol-review.md"
 test -f "$ROOT_DIR/agents/claudex-frontend.md"
 test -f "$ROOT_DIR/prompts/terra-routing.md"
+test -x "$ROOT_DIR/scripts/verify-install.sh"
+test -x "$ROOT_DIR/scripts/uninstall.sh"
+test -x "$ROOT_DIR/scripts/install-state.py"
+grep -Fq '### Agent installation contract' "$ROOT_DIR/README.md" || fail 'README must define the agent installation contract'
+grep -Fq '## Human quick start' "$ROOT_DIR/README.md" || fail 'README must provide a human quick start'
+grep -Fq '## Backups, rollback, and uninstall' "$ROOT_DIR/README.md" || fail 'README must document recovery and uninstall'
+grep -Fq 'Do not report an operational installation until this succeeds.' "$ROOT_DIR/README.md" || fail 'README must distinguish local verification from authenticated operation'
+grep -Fq 'unknown sibling files are preserved' "$ROOT_DIR/README.md" || fail 'README must disclose managed-file preservation behavior'
 grep -Fq 'Treat an explicit user request containing `plan`, `planning`, `architecture`, or `architectural` as a direct Sol trigger' "$ROOT_DIR/codex/AGENTS.md" || fail 'Codex AGENTS policy must treat operative plan and architecture words as direct Sol triggers'
 grep -Fq 'Before the root finalizes, presents, approves, or reviews any implementation plan' "$ROOT_DIR/codex/AGENTS.md" || fail 'Codex AGENTS policy must require Sol for every implementation plan'
 grep -Fq 'Use whenever a user asks to plan, review a plan, discuss planning, make or review an architecture choice' "$ROOT_DIR/codex/skills/claudex-routing/SKILL.md" || fail 'routing skill description must trigger on plan and architecture requests'
@@ -211,11 +223,15 @@ cat >"$INSTALL_MOCK_BIN/cliproxyapi" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
+cat >"$INSTALL_MOCK_BIN/codex" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
 cat >"$INSTALL_MOCK_BIN/curl" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
-chmod 755 "$INSTALL_MOCK_BIN/claude" "$INSTALL_MOCK_BIN/cliproxyapi" "$INSTALL_MOCK_BIN/curl"
+chmod 755 "$INSTALL_MOCK_BIN/claude" "$INSTALL_MOCK_BIN/cliproxyapi" "$INSTALL_MOCK_BIN/codex" "$INSTALL_MOCK_BIN/curl"
 env \
   HOME="$INSTALL_HOME" \
   XDG_CONFIG_HOME="$INSTALL_XDG" \
@@ -233,18 +249,42 @@ test -x "$INSTALL_HOME/.local/bin/claudex-usage-efficiency" || fail 'install.sh 
 cmp -s "$ROOT_DIR/codex/AGENTS.md" "$INSTALL_HOME/.codex/AGENTS.md" || fail 'install.sh must install repo-backed Codex policy'
 cmp -s "$ROOT_DIR/codex/agents/claudex-luna.toml" "$INSTALL_HOME/.codex/agents/claudex-luna.toml" || fail 'install.sh must install repo-backed Codex agents'
 cmp -s "$ROOT_DIR/codex/skills/claudex-routing/SKILL.md" "$INSTALL_HOME/.codex/skills/claudex-routing/SKILL.md" || fail 'install.sh must install repo-backed Codex skills'
-cmp -s "$ROOT_DIR/codex/agents/claudex-sol-review.toml" "$INSTALL_HOME/Library/Application Support/orca/codex-runtime-home/home/agents/claudex-sol-review.toml" || fail 'install.sh must install repo-backed Orca Codex agents'
 grep -Fq 'max_threads = 3' "$INSTALL_HOME/.codex/config.toml" || fail 'install.sh must cap Codex subagent threads at three'
-grep -Fq 'max_threads = 3' "$INSTALL_HOME/Library/Application Support/orca/codex-runtime-home/home/config.toml" || fail 'install.sh must cap Orca Codex subagent threads at three'
-printf '%s\n' 'stale prompt' >"$INSTALLED_PROMPT"
-printf '%s\n' 'stale agent' >"$INSTALLED_AGENT_HOME/claudex-sol-review.md"
-printf '%s\n' 'stale codex policy' >"$INSTALL_HOME/.codex/AGENTS.md"
-printf '%s\n' 'stale orca agent' >"$INSTALL_HOME/Library/Application Support/orca/codex-runtime-home/home/agents/claudex-sol-review.toml"
+test ! -e "$INSTALL_HOME/Library/Application Support/orca/codex-runtime-home/home" || fail 'install.sh must not create an absent default Orca runtime'
+AUTO_ORCA_HOME="$TMP_DIR/auto-orca-home"
+mkdir -p "$AUTO_ORCA_HOME/Library/Application Support/orca/codex-runtime-home/home"
+mkdir -p "$AUTO_ORCA_HOME/.codex"
+printf '%s\n' '[agents]' 'max_threads = 9' 'max_depth = 2' >"$AUTO_ORCA_HOME/.codex/config.toml"
+HOME="$AUTO_ORCA_HOME" CODEX_HOME="$AUTO_ORCA_HOME/.codex" CLAUDEX_SYNC_INTERNAL=1 "$ROOT_DIR/scripts/sync-codex-orca.sh" >/dev/null
+cmp -s "$ROOT_DIR/codex/AGENTS.md" "$AUTO_ORCA_HOME/Library/Application Support/orca/codex-runtime-home/home/AGENTS.md" || fail 'an existing default Orca runtime must be detected and synced'
+grep -Fq 'max_depth = 1' "$AUTO_ORCA_HOME/.codex/config.toml" || fail 'workflow sync must replace an existing noncompliant max_depth value'
+! grep -Fq 'max_depth = 2' "$AUTO_ORCA_HOME/.codex/config.toml" || fail 'workflow sync must not retain a stale max_depth value'
+UNBACKED_SYNC_HOME="$TMP_DIR/unbacked-sync-home"
+expect_fail env HOME="$UNBACKED_SYNC_HOME" CODEX_HOME="$UNBACKED_SYNC_HOME/.codex" "$ROOT_DIR/scripts/sync-codex-orca.sh"
+test ! -e "$UNBACKED_SYNC_HOME/.codex" || fail 'direct workflow sync must refuse to mutate without installer recovery accounting'
+INSTALL_ORCA="$INSTALL_HOME/orca-runtime"
+printf '%s\n' 'keep this user file' >"$INSTALL_HOME/.codex/skills/claudex-routing/user-note.txt"
 env \
   HOME="$INSTALL_HOME" \
   XDG_CONFIG_HOME="$INSTALL_XDG" \
   PATH="$INSTALL_MOCK_BIN:$PATH" \
   SHELL=/bin/zsh \
+  ORCA_CODEX_HOME="$INSTALL_ORCA" \
+  CLAUDEX_INSTALL_MODE=configure-only \
+  "$ROOT_DIR/install.sh" --skip-login >/dev/null
+cmp -s "$ROOT_DIR/codex/agents/claudex-sol-review.toml" "$INSTALL_ORCA/agents/claudex-sol-review.toml" || fail 'an explicit Orca target must authorize creation and sync'
+grep -Fq 'max_threads = 3' "$INSTALL_ORCA/config.toml" || fail 'explicit Orca sync must cap subagent threads at three'
+grep -Fq 'keep this user file' "$INSTALL_HOME/.codex/skills/claudex-routing/user-note.txt" || fail 'workflow sync must preserve unknown files beside managed skill files'
+printf '%s\n' 'stale prompt' >"$INSTALLED_PROMPT"
+printf '%s\n' 'stale agent' >"$INSTALLED_AGENT_HOME/claudex-sol-review.md"
+printf '%s\n' 'stale codex policy' >"$INSTALL_HOME/.codex/AGENTS.md"
+printf '%s\n' 'stale orca agent' >"$INSTALL_ORCA/agents/claudex-sol-review.toml"
+env \
+  HOME="$INSTALL_HOME" \
+  XDG_CONFIG_HOME="$INSTALL_XDG" \
+  PATH="$INSTALL_MOCK_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  ORCA_CODEX_HOME="$INSTALL_ORCA" \
   CLAUDEX_INSTALL_MODE=configure-only \
   "$ROOT_DIR/install.sh" --skip-login >/dev/null
 cmp -s "$ROOT_DIR/prompts/terra-routing.md" "$INSTALLED_PROMPT" || fail 'install.sh must refresh the installed routing prompt on reinstall'
@@ -252,7 +292,177 @@ for agent in claudex-terra claudex-luna claudex-frontend claudex-sol claudex-sol
   cmp -s "$ROOT_DIR/agents/$agent.md" "$INSTALLED_AGENT_HOME/$agent.md" || fail "install.sh must refresh $agent on reinstall"
 done
 cmp -s "$ROOT_DIR/codex/AGENTS.md" "$INSTALL_HOME/.codex/AGENTS.md" || fail 'install.sh must refresh repo-backed Codex policy'
-cmp -s "$ROOT_DIR/codex/agents/claudex-sol-review.toml" "$INSTALL_HOME/Library/Application Support/orca/codex-runtime-home/home/agents/claudex-sol-review.toml" || fail 'install.sh must refresh repo-backed Orca Codex agents'
+cmp -s "$ROOT_DIR/codex/agents/claudex-sol-review.toml" "$INSTALL_ORCA/agents/claudex-sol-review.toml" || fail 'install.sh must refresh repo-backed Orca Codex agents'
+
+PREFLIGHT_HOME="$TMP_DIR/preflight-home"
+PREFLIGHT_XDG="$TMP_DIR/preflight-xdg"
+PREFLIGHT_BIN="$TMP_DIR/preflight-bin"
+mkdir -p "$PREFLIGHT_HOME" "$PREFLIGHT_XDG" "$PREFLIGHT_BIN"
+for command_name in chmod cmp dirname find grep install mkdir openssl sed uname; do
+  ln -s "$(command -v "$command_name")" "$PREFLIGHT_BIN/$command_name"
+done
+expect_fail /usr/bin/env \
+  HOME="$PREFLIGHT_HOME" \
+  XDG_CONFIG_HOME="$PREFLIGHT_XDG" \
+  PATH="$PREFLIGHT_BIN" \
+  SHELL=/bin/zsh \
+  CLAUDEX_INSTALL_MODE=configure-only \
+  /bin/bash "$ROOT_DIR/install.sh" --skip-login
+test ! -e "$PREFLIGHT_XDG/claudex" || fail 'missing-prerequisite preflight must not create Claudex config'
+test ! -e "$PREFLIGHT_HOME/.codex" || fail 'missing-prerequisite preflight must not create Codex workflow files'
+
+PARTIAL_HOME="$TMP_DIR/partial-home"
+PARTIAL_XDG="$TMP_DIR/partial-xdg"
+mkdir -p "$PARTIAL_XDG/claudex"
+chmod 700 "$PARTIAL_XDG/claudex"
+printf '%s\n' 'existing config without token' >"$PARTIAL_XDG/claudex/cliproxyapi.yaml"
+expect_fail env \
+  HOME="$PARTIAL_HOME" \
+  XDG_CONFIG_HOME="$PARTIAL_XDG" \
+  PATH="$INSTALL_MOCK_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  CLAUDEX_INSTALL_MODE=configure-only \
+  "$ROOT_DIR/install.sh" --skip-login
+test ! -e "$PARTIAL_HOME/.local/bin/claudex" || fail 'partial proxy state must fail before launcher installation'
+printf '%s\n' 'token-a' >"$PARTIAL_XDG/claudex/token"
+printf '%s\n' 'api-keys: [token-b]' >"$PARTIAL_XDG/claudex/cliproxyapi.yaml"
+expect_fail env \
+  HOME="$PARTIAL_HOME" \
+  XDG_CONFIG_HOME="$PARTIAL_XDG" \
+  PATH="$INSTALL_MOCK_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  CLAUDEX_INSTALL_MODE=configure-only \
+  "$ROOT_DIR/install.sh" --skip-login
+test ! -e "$PARTIAL_HOME/.codex" || fail 'mismatched proxy config/token must fail before workflow installation'
+
+PERMISSION_HOME="$TMP_DIR/permission-home"
+PERMISSION_XDG="$TMP_DIR/permission-xdg"
+mkdir -p "$PERMISSION_XDG/claudex"
+chmod 700 "$PERMISSION_XDG/claudex"
+printf '%s\n' 'mode-token' >"$PERMISSION_XDG/claudex/token"
+printf '%s\n' 'api-keys: [mode-token]' >"$PERMISSION_XDG/claudex/cliproxyapi.yaml"
+chmod 644 "$PERMISSION_XDG/claudex/token" "$PERMISSION_XDG/claudex/cliproxyapi.yaml"
+expect_fail env \
+  HOME="$PERMISSION_HOME" \
+  XDG_CONFIG_HOME="$PERMISSION_XDG" \
+  PATH="$INSTALL_MOCK_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  CLAUDEX_INSTALL_MODE=configure-only \
+  "$ROOT_DIR/install.sh" --skip-login
+test "$(stat -f '%Lp' "$PERMISSION_XDG/claudex/token" 2>/dev/null || stat -c '%a' "$PERMISSION_XDG/claudex/token")" = 644 || fail 'preflight must not silently change existing token permissions'
+test ! -e "$PERMISSION_HOME/.local/bin/claudex" || fail 'insecure proxy permissions must fail before managed writes'
+
+SYMLINK_HOME="$TMP_DIR/symlink-home"
+SYMLINK_XDG="$TMP_DIR/symlink-xdg"
+mkdir -p "$SYMLINK_HOME/private" "$SYMLINK_XDG/claudex"
+chmod 700 "$SYMLINK_XDG/claudex"
+printf '%s\n' 'link-token' >"$SYMLINK_HOME/private/token"
+printf '%s\n' 'api-keys: [link-token]' >"$SYMLINK_HOME/private/config"
+chmod 600 "$SYMLINK_HOME/private/token" "$SYMLINK_HOME/private/config"
+ln -s "$SYMLINK_HOME/private/token" "$SYMLINK_XDG/claudex/token"
+ln -s "$SYMLINK_HOME/private/config" "$SYMLINK_XDG/claudex/cliproxyapi.yaml"
+expect_fail env \
+  HOME="$SYMLINK_HOME" \
+  XDG_CONFIG_HOME="$SYMLINK_XDG" \
+  PATH="$INSTALL_MOCK_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  CLAUDEX_INSTALL_MODE=configure-only \
+  "$ROOT_DIR/install.sh" --skip-login
+test ! -e "$SYMLINK_HOME/.local/bin/claudex" || fail 'symlinked proxy state must fail before managed writes'
+
+NONREGULAR_HOME="$TMP_DIR/nonregular-home"
+NONREGULAR_XDG="$TMP_DIR/nonregular-xdg"
+mkdir -p "$NONREGULAR_XDG/claudex/token"
+chmod 700 "$NONREGULAR_XDG/claudex"
+expect_fail env \
+  HOME="$NONREGULAR_HOME" \
+  XDG_CONFIG_HOME="$NONREGULAR_XDG" \
+  PATH="$INSTALL_MOCK_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  CLAUDEX_INSTALL_MODE=configure-only \
+  "$ROOT_DIR/install.sh" --skip-login
+test ! -e "$NONREGULAR_HOME/.local/bin/claudex" || fail 'a non-regular proxy target must fail before managed writes'
+test ! -e "$NONREGULAR_HOME/.local/state/claudex/install-backups" || fail 'a non-regular proxy target must fail before backup-state mutation'
+
+MANAGED_LINK_HOME="$TMP_DIR/managed-link-home"
+MANAGED_LINK_XDG="$TMP_DIR/managed-link-xdg"
+mkdir -p "$MANAGED_LINK_HOME/.codex" "$MANAGED_LINK_HOME/private" "$MANAGED_LINK_XDG"
+printf '%s\n' 'outside managed target' >"$MANAGED_LINK_HOME/private/AGENTS.md"
+ln -s "$MANAGED_LINK_HOME/private/AGENTS.md" "$MANAGED_LINK_HOME/.codex/AGENTS.md"
+expect_fail env \
+  HOME="$MANAGED_LINK_HOME" \
+  XDG_CONFIG_HOME="$MANAGED_LINK_XDG" \
+  PATH="$INSTALL_MOCK_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  CLAUDEX_INSTALL_MODE=configure-only \
+  "$ROOT_DIR/install.sh" --skip-login
+grep -Fq 'outside managed target' "$MANAGED_LINK_HOME/private/AGENTS.md" || fail 'managed-target symlink refusal must not mutate its referent'
+test ! -e "$MANAGED_LINK_XDG/claudex" || fail 'managed-target symlink refusal must occur before configuration writes'
+
+FAIL_HOME="$TMP_DIR/fail-home"
+FAIL_XDG="$TMP_DIR/fail-xdg"
+FAIL_BIN="$TMP_DIR/fail-bin"
+mkdir -p "$FAIL_HOME" "$FAIL_XDG" "$FAIL_BIN"
+cp "$INSTALL_MOCK_BIN/claude" "$INSTALL_MOCK_BIN/cliproxyapi" "$INSTALL_MOCK_BIN/codex" "$INSTALL_MOCK_BIN/curl" "$FAIL_BIN/"
+cat >"$FAIL_BIN/install" <<'EOF'
+#!/usr/bin/env bash
+for argument in "$@"; do
+  case "$argument" in */codex/AGENTS.md) exit 73 ;; esac
+done
+exec "${REAL_INSTALL:?}" "$@"
+EOF
+chmod 755 "$FAIL_BIN/"*
+REAL_INSTALL="$(command -v install)"
+expect_fail env \
+  HOME="$FAIL_HOME" \
+  XDG_CONFIG_HOME="$FAIL_XDG" \
+  PATH="$FAIL_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  REAL_INSTALL="$REAL_INSTALL" \
+  CLAUDEX_INSTALL_MODE=configure-only \
+  "$ROOT_DIR/install.sh" --skip-login
+FAILED_BACKUP="$(HOME="$FAIL_HOME" XDG_STATE_HOME="$FAIL_HOME/.local/state" "$ROOT_DIR/scripts/uninstall.sh" --list-backups | tail -n 1 | cut -f 1)"
+test -n "$FAILED_BACKUP" || fail 'a failed mid-install run must expose a recovery backup'
+HOME="$FAIL_HOME" XDG_STATE_HOME="$FAIL_HOME/.local/state" "$ROOT_DIR/scripts/uninstall.sh" --restore-backup "$FAILED_BACKUP" >/dev/null
+test ! -e "$FAIL_HOME/.local/bin/claudex" || fail 'failed-install rollback must restore the pre-install launcher state'
+
+RESTORE_HOME="$TMP_DIR/restore-home"
+RESTORE_XDG="$TMP_DIR/restore-xdg"
+mkdir -p "$RESTORE_HOME/.codex/agents" "$RESTORE_HOME/.codex/skills/claudex-routing" "$RESTORE_XDG"
+printf '%s\n' 'original user policy' >"$RESTORE_HOME/.codex/AGENTS.md"
+printf '%s\n' 'unknown user agent' >"$RESTORE_HOME/.codex/agents/user-agent.toml"
+printf '%s\n' 'unknown skill note' >"$RESTORE_HOME/.codex/skills/claudex-routing/user-note.txt"
+env \
+  HOME="$RESTORE_HOME" \
+  XDG_CONFIG_HOME="$RESTORE_XDG" \
+  PATH="$INSTALL_MOCK_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  CLAUDEX_INSTALL_MODE=configure-only \
+  "$ROOT_DIR/install.sh" --skip-login >/dev/null
+RESTORE_STATE="$RESTORE_HOME/.local/state/claudex/install-backups"
+test "$(stat -f '%Lp' "$RESTORE_STATE" 2>/dev/null || stat -c '%a' "$RESTORE_STATE")" = 700 || fail 'install backup directory must be private'
+test "$(stat -f '%Lp' "$RESTORE_STATE/ownership.json" 2>/dev/null || stat -c '%a' "$RESTORE_STATE/ownership.json")" = 600 || fail 'install ownership manifest must be private'
+printf '%s\n' 'pre-update local edit' >"$RESTORE_HOME/.claude/agents/claudex-sol-review.md"
+env \
+  HOME="$RESTORE_HOME" \
+  XDG_CONFIG_HOME="$RESTORE_XDG" \
+  PATH="$INSTALL_MOCK_BIN:$PATH" \
+  SHELL=/bin/zsh \
+  CLAUDEX_INSTALL_MODE=configure-only \
+  "$ROOT_DIR/install.sh" --skip-login >/dev/null
+LATEST_BACKUP="$(HOME="$RESTORE_HOME" XDG_STATE_HOME="$RESTORE_HOME/.local/state" "$ROOT_DIR/scripts/uninstall.sh" --list-backups | tail -n 1 | cut -f 1)"
+HOME="$RESTORE_HOME" XDG_STATE_HOME="$RESTORE_HOME/.local/state" "$ROOT_DIR/scripts/uninstall.sh" --restore-backup "$LATEST_BACKUP" >/dev/null
+grep -Fq 'pre-update local edit' "$RESTORE_HOME/.claude/agents/claudex-sol-review.md" || fail 'explicit rollback must restore the selected pre-install state'
+printf '%s\n' 'post-install conflicting edit' >"$RESTORE_HOME/.codex/AGENTS.md"
+expect_fail env HOME="$RESTORE_HOME" XDG_STATE_HOME="$RESTORE_HOME/.local/state" "$ROOT_DIR/scripts/uninstall.sh" --restore-original
+grep -Fq 'post-install conflicting edit' "$RESTORE_HOME/.codex/AGENTS.md" || fail 'uninstall conflict must preserve post-install user edits'
+cp "$ROOT_DIR/codex/AGENTS.md" "$RESTORE_HOME/.codex/AGENTS.md"
+HOME="$RESTORE_HOME" XDG_STATE_HOME="$RESTORE_HOME/.local/state" "$ROOT_DIR/scripts/uninstall.sh" --restore-original >/dev/null
+grep -Fq 'original user policy' "$RESTORE_HOME/.codex/AGENTS.md" || fail 'uninstall must restore the original pre-Claudex managed file'
+test ! -e "$RESTORE_HOME/.local/bin/claudex" || fail 'uninstall must remove an unchanged Claudex-created launcher'
+grep -Fq 'unknown user agent' "$RESTORE_HOME/.codex/agents/user-agent.toml" || fail 'uninstall must preserve unknown sibling agents'
+grep -Fq 'unknown skill note' "$RESTORE_HOME/.codex/skills/claudex-routing/user-note.txt" || fail 'uninstall must preserve unknown sibling skill files'
+test -f "$RESTORE_XDG/claudex/cliproxyapi.yaml" && test -f "$RESTORE_XDG/claudex/token" || fail 'uninstall must retain proxy config and token'
 printf '%s\n' 'sentinel routing prompt from installed file' >"$INSTALLED_PROMPT"
 rm -f "$CLAUDE_ARGS_LOG"
 env \

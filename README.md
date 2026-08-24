@@ -12,6 +12,16 @@ Defaults:
 - Proxy: localhost only (`127.0.0.1:8317`)
 - Claude Code permission prompts: bypassed by default
 
+## Requirements
+
+- A Homebrew-supported macOS or Linux system
+- Internet access during dependency installation and OAuth
+- Git, Bash, `curl`, OpenSSL, Python 3, and standard POSIX file utilities
+- A Codex account accepted by CLIProxyAPI's OAuth flow
+- Permission to install packages and update user-level configuration
+
+The installer adds Homebrew when it is unavailable, then uses it to install CLIProxyAPI and, when needed, Codex. It uses Anthropic's official native installer for Claude Code. Review those third-party installers and obtain the computer owner's authorization before running them.
+
 ## Install
 
 ### macOS or Linux
@@ -24,23 +34,84 @@ cd claudex
 
 The installer:
 
-1. Installs Homebrew if it is unavailable.
-2. Installs CLIProxyAPI using Homebrew.
-3. Installs Claude Code using Anthropic's official native installer when it is not found.
-4. Installs the OpenAI Codex CLI using Homebrew, with an npm fallback, when it is not found.
-5. Generates a unique local proxy token.
-6. Installs the `claudex` launcher and local utility commands to `~/.local/bin`.
-7. Installs the source-controlled Terra routing prompt to `~/.config/claudex/terra-routing.md`.
-8. Installs the five Claudex agent definitions to `~/.claude/agents`.
-9. Installs the repo-backed Claudex-aligned Codex and Orca workflow config: global routing policy, subagents, skills, and a three-thread subagent cap.
-10. Starts the Codex OAuth login when credentials are not already present.
+1. Validates the platform, prerequisites, and proxy config/token consistency before changing files.
+2. Installs missing Homebrew, CLIProxyAPI, Claude Code, and Codex dependencies.
+3. Creates a private, timestamped recovery snapshot of every managed path it will change.
+4. Generates a unique local proxy token and config on a fresh installation. Existing matching config/token files are preserved.
+5. Installs the launcher and utilities to `~/.local/bin`, routing policy to `~/.config/claudex`, and Claude agents to `~/.claude/agents`.
+6. Installs the global Codex policy, agents, skills, and three-thread/one-level subagent limits under `~/.codex`.
+7. Updates an existing Orca Codex runtime when detected. It does not create an absent Orca runtime unless explicitly enabled.
+8. Runs deterministic local verification, then starts Codex OAuth when credentials are not already present.
+
+### Safety and mutation scope
+
+The installer manages these user-level targets:
+
+| Target | Behavior |
+| --- | --- |
+| `~/.local/bin/claudex*` | Replaced with repository launchers/utilities |
+| `~/.config/claudex/terra-routing.md` | Replaced with the repository routing prompt |
+| `~/.claude/agents/claudex-*.md` | Replaced with the five repository agent definitions |
+| `~/.codex/AGENTS.md` | Replaced with the Claudex global Codex policy |
+| `~/.codex/agents/<managed files>` | Managed files are replaced; unknown sibling files are preserved |
+| `~/.codex/skills/<managed files>` | Managed files are replaced; unknown sibling files are preserved |
+| `~/.codex/config.toml` | The `[agents]` section is updated to `max_threads = 3` and `max_depth = 1` |
+| Shell startup file | An exact `# Claudex PATH` block is appended only when needed |
+| Existing Orca runtime | Receives the equivalent Codex policy, agents, skills, and agent limits |
+
+Before these writes, originals and per-run states are stored under `${XDG_STATE_HOME:-~/.local/state}/claudex/install-backups` with private permissions. Reinstalls preserve the first pre-Claudex state and add a new rollback point. OAuth credentials under `~/.cli-proxy-api` are never copied into backups.
+
+Set `CLAUDEX_SYNC_ORCA_CODEX=1` to explicitly create/sync the configured Orca runtime, or `CLAUDEX_SYNC_ORCA_CODEX=0` to disable Orca sync. Setting `ORCA_CODEX_HOME` explicitly also authorizes that target.
+
+### Agent installation contract
+
+An agent installing Claudex should:
+
+1. Read this mutation list and confirm that package installation, OAuth, and user-global configuration changes are authorized.
+2. Inspect pre-existing files in the managed targets when preserving local customization matters.
+3. Run `./install.sh` without suppressing its output.
+4. Hand control to the human for the browser/device OAuth interaction. Never request, expose, or copy credentials.
+5. Require the installer's local-verification success message.
+6. Run the authenticated smoke test below after OAuth. If login was skipped, do not claim Claudex works end to end.
+7. Explain the human quick start and permission behavior below.
 
 Restart your shell after installation if `claudex` is not immediately found.
 
-## Run
+If Claude Code was already open, restart it or run `/agents` so it reloads the new custom agents.
+
+## Verify installation
+
+The installer runs the non-networked file/configuration check automatically. Run it again from the clone at any time:
 
 ```bash
+./scripts/verify-install.sh
+```
+
+That check verifies installed files, commands, token/config consistency, private permissions, and Codex agent limits. It does not prove that OAuth is valid or that the model is reachable.
+
+After OAuth, run the explicit end-to-end smoke test:
+
+```bash
+claudex --print "Reply with exactly: OK"
+```
+
+Expected output is `OK`. This starts the local proxy and makes a model request. Do not report an operational installation until this succeeds.
+
+## Human quick start
+
+Open a terminal in the project you want to work on and run:
+
+```bash
+cd path/to/your-project
 claudex
+```
+
+Then describe the task normally. The coordinator handles implementation and automatically routes research to Luna, frontend work to Frontend, and planning or architecture decisions to Sol. Humans normally do not need to select an agent manually.
+
+Claudex bypasses Claude Code permission prompts by default. For normal permission prompts, start it with:
+
+```bash
+CLAUDEX_SKIP_PERMISSIONS=0 claudex
 ```
 
 Arguments are passed directly to Claude Code:
@@ -49,6 +120,8 @@ Arguments are passed directly to Claude Code:
 claudex --resume
 claudex --print "Reply with exactly: OK"
 ```
+
+Direct role commands are optional and useful when the human wants to force a bounded task; the next section lists them.
 
 ## Agent workflow
 
@@ -196,6 +269,41 @@ cliproxyapi -config ~/.config/claudex/cliproxyapi.yaml -codex-login
 
 OAuth credentials are stored by CLIProxyAPI under `~/.cli-proxy-api`. They are not part of this repository.
 
+## Troubleshooting
+
+- **`claudex: command not found`:** restart the shell, or source its startup file. Confirm that `~/.local/bin` is in `PATH`.
+- **Agents are missing:** restart an already-open Claude Code session or run `/agents` to reload custom agents.
+- **OAuth was skipped or expired:** run the re-authentication command above, complete the browser/device flow, then rerun the authenticated smoke test.
+- **Proxy fails to start:** inspect `~/.config/claudex/cliproxyapi.log`. Another process may already be using `127.0.0.1:8317`; stop or reconfigure that process before retrying.
+- **Config/token consistency error:** restore both `~/.config/claudex/cliproxyapi.yaml` and `~/.config/claudex/token` from the same installation, or move both aside and rerun the installer to generate a fresh pair. Do not delete OAuth credentials unless intentionally re-authenticating.
+- **Config permission or symlink refusal:** Claudex requires a regular `~/.config/claudex` directory at mode `700` and regular config/token files at mode `600`. Follow the installer's exact `chmod` guidance; replace symlinks with private regular files before retrying.
+- **Installation stops after managed writes:** use the backup ID printed by the failure handler with `./scripts/uninstall.sh --restore-backup BACKUP_ID`. The interrupted run is finalized to its actual on-disk state so rollback remains hash-checked.
+- **Local verification fails:** rerun `./scripts/verify-install.sh` from an up-to-date clone and follow the exact mismatched path it reports. Reinstall only after preserving intentional edits.
+
+## Backups, rollback, and uninstall
+
+List the available install snapshots:
+
+```bash
+./scripts/uninstall.sh --list-backups
+```
+
+Roll back one selected installation run to its immediately preceding state:
+
+```bash
+./scripts/uninstall.sh --restore-backup BACKUP_ID
+```
+
+Remove unchanged Claudex-managed files and restore the original pre-Claudex files:
+
+```bash
+./scripts/uninstall.sh --restore-original
+```
+
+Restore and uninstall are deliberately conservative. Before changing anything, they verify that every managed path still matches the recorded installed hash. If any path changed afterward, the entire restore is refused and the edited files are listed. Preserve or reconcile those edits, return the managed files to the recorded state, and rerun the command.
+
+Uninstall never removes Homebrew, Claude Code, Codex, CLIProxyAPI, proxy config/token, OAuth credentials, telemetry, backup history, or unknown sibling files. These may be shared or needed for recovery. Remove them manually only after deciding they are no longer needed. Keep the repository clone until rollback or uninstall is complete because the recovery commands live under `scripts/`.
+
 ## Update
 
 ```bash
@@ -204,15 +312,9 @@ git pull
 ./install.sh --skip-login
 ```
 
-That reinstall step refreshes the installed Terra routing prompt, Claude Code agent definitions, and the Codex/Orca workflow config from the repository sources.
+That reinstall step validates the current config/token pair, creates a new rollback snapshot, and refreshes the installed Terra routing prompt, Claude Code agent definitions, and Codex/Orca workflow config from the repository sources. `--skip-login` leaves authentication unverified; rerun the authenticated smoke test before claiming the update works end to end.
 
-Refresh only the Codex/Orca workflow config when needed:
-
-```bash
-./scripts/sync-codex-orca.sh
-```
-
-The sync copies `codex/AGENTS.md`, `codex/agents`, and `codex/skills` into `~/.codex` and Orca's isolated Codex runtime home, then enforces the Claudex three-subagent concurrency cap.
+Always update through `install.sh`; direct workflow sync is intentionally unsupported because it would bypass recovery snapshots and invalidate ownership hashes. The installer copies `codex/AGENTS.md`, `codex/agents`, and `codex/skills` into `~/.codex` and into an existing or explicitly enabled Orca Codex runtime, then enforces the Claudex three-subagent concurrency cap.
 
 Update dependencies separately when needed:
 
@@ -226,7 +328,7 @@ claude update
 
 This repository also backs up reusable local workflow assets:
 
-- `codex/` — Claudex-aligned Codex/Orca routing policy, subagents, and skills installed by `./scripts/sync-codex-orca.sh` and `./install.sh`.
+- `codex/` — Claudex-aligned Codex/Orca routing policy, subagents, and skills installed through `./install.sh`; its internal sync step is not a standalone update interface.
 - `actions/buzz-repo-notifier/` — reusable Buzz repository notification GitHub/Forgejo action source and bundled `dist/` entry point.
 
 ## Security
@@ -235,12 +337,5 @@ This repository also backs up reusable local workflow assets:
 - The generated proxy binds only to `127.0.0.1`.
 - Treat private repositories as if they could eventually become public.
 - Never commit `~/.cli-proxy-api`, `~/.config/claudex/token`, or generated proxy configuration.
-
-## Requirements
-
-- macOS or Linux
-- Internet access during installation
-- A Codex account accepted by CLIProxyAPI's OAuth flow
-- Git
 
 Claude Code documentation: <https://code.claude.com/docs/en/setup>
