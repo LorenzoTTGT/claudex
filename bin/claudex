@@ -10,7 +10,7 @@ EFFORT="${CLAUDEX_EFFORT:-medium}"
 AUTOCOMPACT="${CLAUDEX_AUTOCOMPACT:-220k}"
 LUNA_MODEL="${CLAUDEX_LUNA_MODEL:-gpt-5.6-luna}"
 SOL_MODEL="${CLAUDEX_SOL_MODEL:-gpt-5.6-sol}"
-FRONTEND_MODEL="gpt-5.5"
+FRONTEND_MODEL="gpt-5.6-terra"
 STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/claudex"
 TERRA_PROMPT_FILE="${CLAUDEX_TERRA_PROMPT_FILE:-$CONFIG_HOME/terra-routing.md}"
 LOG_FILE="$CONFIG_HOME/cliproxyapi.log"
@@ -37,7 +37,7 @@ Usage: claudex [terra|luna|sol|frontend|sol-review|review-gate|install-hook] [ar
   claudex terra [args...] Backward-compatible coordinator alias.
   claudex luna <task>     Run a read-only Luna research/data task.
   claudex sol <task>      Run a medium-effort read-only Sol architecture advisory.
-  claudex frontend <task> Run a high-effort bounded GPT-5.5 frontend implementation task.
+  claudex frontend <task> Run a high-effort bounded Terra frontend implementation task.
   claudex sol-review      Run a medium-effort staged-change Sol Review and save a receipt.
   claudex review-gate     Check whether staged changes need a matching Sol PASS receipt.
   claudex install-hook    Install the review gate in this repository's pre-commit hook.

@@ -1,7 +1,7 @@
 ---
 name: claudex-frontend
-description: High-effort GPT-5.5 frontend implementation specialist. Use for bounded UI components, styling, accessibility, responsive behavior, frontend tests, and directly necessary frontend-local assets. Do not use for backend, auth, schemas, APIs, infrastructure, deployment, final integration, or consequential approval.
-model: gpt-5.5
+description: High-effort Terra frontend implementation specialist. Use for bounded UI components, styling, accessibility, responsive behavior, frontend tests, and directly necessary frontend-local assets. Do not use for backend, auth, schemas, APIs, infrastructure, deployment, final integration, or consequential approval.
+model: gpt-5.6-terra
 effort: high
 permissionMode: default
 tools: Read, Grep, Glob, Edit, Write, Bash

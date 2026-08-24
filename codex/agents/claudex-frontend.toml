@@ -1,6 +1,6 @@
 name = "claudex-frontend"
-description = "High-effort GPT-5.5 frontend implementation specialist for bounded UI components, styling, accessibility, responsive behavior, visual regressions, frontend tests, and directly necessary frontend-local assets."
-model = "gpt-5.5"
+description = "High-effort Terra frontend implementation specialist for bounded UI components, styling, accessibility, responsive behavior, visual regressions, frontend tests, and directly necessary frontend-local assets."
+model = "gpt-5.6-terra"
 model_reasoning_effort = "high"
 
 developer_instructions = """

@@ -6,7 +6,7 @@ Defaults:
 
 - Coordinator: `gpt-5.5` / medium — permanent coordinator and implementer (`terra` remains a compatibility alias)
 - Luna: `gpt-5.6-luna` / high — read-only research and data-operations worker
-- Frontend: `gpt-5.5` / high — bounded GUI/frontend implementation and code-generation worker
+- Frontend: `gpt-5.6-terra` / high — bounded GUI/frontend implementation and code-generation worker
 - Sol advisory: `gpt-5.6-sol` / medium — read-only architecture advice and early risk triage
 - Sol Review: `gpt-5.6-sol` / medium — read-only consequential-change and final-review gate
 - Proxy: localhost only (`127.0.0.1:8317`)
@@ -134,7 +134,7 @@ claudex luna "Inventory the request-validation paths and tests."
 # Read-only architecture analysis.
 claudex sol "Compare the migration strategies for this schema change."
 
-# Bounded frontend implementation using GPT-5.5/high.
+# Bounded frontend implementation using Terra/high.
 claudex frontend "Implement the requested responsive settings panel and its frontend tests."
 
 # Read-only review of the current staged diff. A valid PASS creates a receipt.
@@ -143,7 +143,7 @@ claudex sol-review
 
 Luna is for broad, rule-based work: inventories, data-quality checks, naming consistency, log grouping, and parsing/transform plans. It must not edit files or change state. Use deterministic scripts for known bulk transformations.
 
-Frontend is a fixed `gpt-5.5` / high-effort implementer for bounded UI components, styling, accessibility, responsive behavior, frontend tests, and directly necessary frontend-local assets. It may not change backend logic, schemas, authentication, public APIs, deployment, or unrelated shared infrastructure; when ownership is unclear, it returns the boundary to the coordinator. The coordinator retains task decomposition, verification synthesis, final integration, and completion reporting. Frontend implementation and tests never replace a required Sol Review or review receipt.
+Frontend is a fixed `gpt-5.6-terra` / high-effort implementer for bounded UI components, styling, accessibility, responsive behavior, frontend tests, and directly necessary frontend-local assets. It may not change backend logic, schemas, authentication, public APIs, deployment, or unrelated shared infrastructure; when ownership is unclear, it returns the boundary to the coordinator. The coordinator retains task decomposition, verification synthesis, final integration, and completion reporting. Frontend implementation and tests never replace a required Sol Review or review receipt.
 
 Use medium-effort Sol for mandatory scoped feedback whenever the coordinator creates, presents, approves, or reviews an implementation plan or makes, presents, approves, or reviews an architecture choice. An operative user mention of `plan`, `planning`, `architecture`, or `architectural` is a direct trigger unless clearly negated. An architecture choice means a decision among credible structural, contract, data-flow, storage, or dependency alternatives, not a routine mechanical implementation choice. One Sol invocation may cover a plan and its architecture choices; materially revising the plan or introducing a new architecture choice requires another invocation. A trivial direct edit needing neither does not trigger Sol, and work should not be artificially planned just to trigger delegation.
 
@@ -222,7 +222,7 @@ Supported variables:
 | `CLAUDEX_PROXY_CONFIG` | `~/.config/claudex/cliproxyapi.yaml` | Proxy configuration |
 | `CLAUDEX_TOKEN_FILE` | `~/.config/claudex/token` | Local proxy token |
 
-`CLAUDEX_EFFORT` and a compatibility `terra` CLI `--effort` argument control only the main GPT-5.5 session. Luna, Frontend, Sol advisory, and Sol Review have fixed role efforts. Frontend also fixes its agent and model to `claudex-frontend` and `gpt-5.5`; its command rejects agent, model, and effort overrides. `xhigh` is unsupported and rejected before Claudex starts or probes the proxy.
+`CLAUDEX_EFFORT` and a compatibility `terra` CLI `--effort` argument control only the main GPT-5.5 session. Luna, Frontend, Sol advisory, and Sol Review have fixed role efforts. Frontend also fixes its agent and model to `claudex-frontend` and `gpt-5.6-terra`; its command rejects agent, model, and effort overrides. `xhigh` is unsupported and rejected before Claudex starts or probes the proxy.
 
 Claudex bypasses Claude Code permission prompts by default. Re-enable them for one session:
 
