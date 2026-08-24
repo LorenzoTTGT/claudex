@@ -255,8 +255,11 @@ AUTO_ORCA_HOME="$TMP_DIR/auto-orca-home"
 mkdir -p "$AUTO_ORCA_HOME/Library/Application Support/orca/codex-runtime-home/home"
 mkdir -p "$AUTO_ORCA_HOME/.codex"
 printf '%s\n' '[agents]' 'max_threads = 9' 'max_depth = 2' >"$AUTO_ORCA_HOME/.codex/config.toml"
+printf '%s\n' 'pre-sync policy' >"$AUTO_ORCA_HOME/.codex/AGENTS.md"
+ln -s "$AUTO_ORCA_HOME/.codex/AGENTS.md" "$AUTO_ORCA_HOME/Library/Application Support/orca/codex-runtime-home/home/AGENTS.md"
 HOME="$AUTO_ORCA_HOME" CODEX_HOME="$AUTO_ORCA_HOME/.codex" CLAUDEX_SYNC_INTERNAL=1 "$ROOT_DIR/scripts/sync-codex-orca.sh" >/dev/null
 cmp -s "$ROOT_DIR/codex/AGENTS.md" "$AUTO_ORCA_HOME/Library/Application Support/orca/codex-runtime-home/home/AGENTS.md" || fail 'an existing default Orca runtime must be detected and synced'
+test -L "$AUTO_ORCA_HOME/Library/Application Support/orca/codex-runtime-home/home/AGENTS.md" || fail 'Orca sync must preserve a policy link shared with the primary Codex home'
 grep -Fq 'max_depth = 1' "$AUTO_ORCA_HOME/.codex/config.toml" || fail 'workflow sync must replace an existing noncompliant max_depth value'
 ! grep -Fq 'max_depth = 2' "$AUTO_ORCA_HOME/.codex/config.toml" || fail 'workflow sync must not retain a stale max_depth value'
 UNBACKED_SYNC_HOME="$TMP_DIR/unbacked-sync-home"

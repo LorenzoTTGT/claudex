@@ -45,6 +45,13 @@ should_sync_orca() {
   [[ "$ORCA_HOME_EXPLICIT" == "1" || -d "$ORCA_CODEX_HOME" ]]
 }
 
+is_shared_policy_link() {
+  local policy="$1/AGENTS.md"
+  [[ "$1" != "$CODEX_HOME" ]] || return 1
+  [[ -L "$policy" ]] || return 1
+  [[ "$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$policy")" == "$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$CODEX_HOME/AGENTS.md")" ]]
+}
+
 [[ -f "$SOURCE_DIR/AGENTS.md" ]] || { echo "Missing $SOURCE_DIR/AGENTS.md" >&2; exit 1; }
 [[ -d "$SOURCE_DIR/agents" ]] || { echo "Missing $SOURCE_DIR/agents" >&2; exit 1; }
 [[ -d "$SOURCE_DIR/skills" ]] || { echo "Missing $SOURCE_DIR/skills" >&2; exit 1; }
@@ -52,7 +59,11 @@ should_sync_orca() {
 sync_tree() {
   local destination="$1"
   mkdir -p "$destination" "$destination/agents" "$destination/skills"
-  install -m 644 "$SOURCE_DIR/AGENTS.md" "$destination/AGENTS.md"
+  if is_shared_policy_link "$destination"; then
+    echo "Claudex: preserved shared policy link at $destination/AGENTS.md"
+  else
+    install -m 644 "$SOURCE_DIR/AGENTS.md" "$destination/AGENTS.md"
+  fi
 
   find "$SOURCE_DIR/agents" -maxdepth 1 -type f -name '*.toml' -print0 | while IFS= read -r -d '' file; do
     install -m 644 "$file" "$destination/agents/$(basename "$file")"
@@ -72,7 +83,8 @@ sync_tree() {
 
 list_tree_targets() {
   local destination="$1" file skill name relative
-  printf '%s\n' "$destination/AGENTS.md" "$destination/config.toml"
+  is_shared_policy_link "$destination" || printf '%s\n' "$destination/AGENTS.md"
+  printf '%s\n' "$destination/config.toml"
   find "$SOURCE_DIR/agents" -maxdepth 1 -type f -name '*.toml' -print0 | while IFS= read -r -d '' file; do
     printf '%s\n' "$destination/agents/$(basename "$file")"
   done
