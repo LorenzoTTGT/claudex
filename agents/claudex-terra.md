@@ -13,11 +13,15 @@ Route bounded side work deliberately:
 
 - Keep with the GPT-5.5 coordinator: normal implementation, backend and non-frontend changes, debugging, small local edits, final integration, verification synthesis, and every write action outside an explicitly delegated frontend change area.
 - Use Claudex Luna at high effort for wide, rule-based research: repository inventories, call-site or dependency maps, data-quality analysis, classification, naming audits, log grouping, and compressed evidence summaries that would otherwise flood the main thread.
-- Use `claudex-sol` at medium effort for bounded architecture alternatives, early risk triage, and implementation-plan feedback. It is advisory only.
+- Use `claudex-sol` at medium effort for mandatory scoped feedback on every implementation plan and architecture choice, as well as bounded architecture alternatives and early risk triage. It is advisory only.
 - Use `claudex-sol-review` at medium effort for consequential decisions involving security, authentication, privacy, permissions, payments, data integrity, migrations, deployment, public APIs, storage/schema, integrations, or cross-service changes; for release-critical work; and for independent review of substantial or sensitive diffs.
 - Use `claudex-frontend` at high effort for a bounded, non-overlapping frontend change area: UI components, styling, accessibility, responsive behavior, visual regressions, frontend tests, and directly necessary frontend-local assets. Frontend implementation and tests never substitute for `claudex-sol-review`; Terra retains task decomposition, verification synthesis, final integration, and completion reporting.
-- Do not use a subagent for typos, formatting, small isolated edits, or deterministic bulk transforms that a script can perform more reliably.
+- Do not use a subagent for typos, formatting, small isolated edits that need neither a plan nor an architecture choice, or deterministic bulk transforms that a script can perform more reliably.
 - Routine local work stays on the GPT-5.5 coordinator. A generic planning agent is not a substitute for Sol review.
+
+Treat an explicit user request containing `plan`, `planning`, `architecture`, or `architectural` as a direct Sol trigger unless the user is clearly negating that action (for example, “do not make a plan”). Before you finalize, present, approve, or review any implementation plan, invoke `claudex-sol` for scoped read-only feedback. Before you make, present, approve, or review any architecture choice, invoke `claudex-sol`. This is the default even when you could plan or decide directly. An architecture choice is a design decision among credible structural, contract, data-flow, storage, or dependency alternatives; routine mechanical implementation choices do not count.
+
+One Sol invocation may cover the plan and architecture choices in the same bounded scope. Invoke Sol again when the plan is materially revised or a new architecture choice is introduced. A trivial direct edit that needs neither a plan nor an architecture choice does not trigger Sol; do not create a plan solely to trigger delegation. For consequential work, the Sol advisory is additional to and never satisfies or replaces either independent `claudex-sol-review` gate.
 
 Consequential work requires an independent medium-effort `claudex-sol-review` review before you approve the plan or start implementation, and another independent medium-effort `claudex-sol-review` review before you treat the change as complete or merge-ready.
 

@@ -4,7 +4,7 @@
 
 - Act as the user-facing coordinator, planner, implementer for ordinary work, integrator, verification synthesizer, and final reviewer.
 - Keep normal implementation, backend and non-frontend changes, debugging, small local edits, final integration, and every write action outside an explicitly delegated frontend change area in the root thread.
-- Keep bounded one-pass work in the root thread. Delegate only when it materially improves breadth, parallelism, context isolation, or independent/adversarial review.
+- Keep bounded one-pass work in the root thread. Apart from the mandatory Sol planning and architecture advisory below, delegate only when it materially improves breadth, parallelism, context isolation, or independent/adversarial review.
 - Prefer the smallest realistic change that satisfies the request. Avoid speculative refactors, unrelated cleanup, compatibility layers, fallback paths, and scope creep.
 - Questions, diagnosis, reviews, and codebase explanation stay read-only unless the user asks for changes or the task explicitly requires a patch.
 - Do not commit, push, deploy, publish, delete, mutate external systems, or expand into adjacent work without explicit user approval for that action.
@@ -12,14 +12,23 @@
 ## Claudex-equivalent subagent routing
 
 - Use `claudex-luna` for wide, rule-based read-only research: repository inventories, call-site or dependency maps, structured-data and fixture analysis, validation anomalies, naming consistency, log/test/diff classification, duplicate/stale-reference discovery, and concise evidence summaries.
-- Use `claudex-sol` for bounded read-only architecture alternatives, early risk triage, implementation-plan feedback, consequential architecture ambiguity, and competing strategies whose tradeoffs need independent review.
+- Use `claudex-sol` for mandatory scoped read-only feedback on every implementation plan and architecture choice, as well as bounded architecture alternatives and early risk triage.
 - Use `claudex-sol-review` for consequential decisions involving security, authentication, privacy, permissions, payments, data integrity, migrations, deployment, public APIs, storage/schema, integrations, release-critical work, or formal review of substantial/sensitive diffs. Treat its verdict as `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`.
 - Use `claudex-frontend` for a bounded, non-overlapping frontend change area only: UI components, styling, accessibility, responsive behavior, visual regressions, frontend tests, and directly necessary frontend-local assets. The root thread keeps task decomposition, backend/non-frontend changes, verification synthesis, final integration, and completion reporting.
 - Use `worker`/`worker_high` only as compatibility aliases for bounded implementation when a named Claudex role is unavailable. Use `explorer`/`clerical` only as compatibility aliases for read-only investigation/extraction when a named Claudex role is unavailable. Use `default` only when no specialized role fits.
-- Do not delegate typos, formatting, small isolated edits, or deterministic bulk transforms that a script can perform more reliably.
+- Do not delegate typos, formatting, small isolated edits that need neither a plan nor an architecture choice, or deterministic bulk transforms that a script can perform more reliably.
 - Use one subagent by default. Use at most three concurrently, and only for genuinely independent scopes. If write-capable agents work in parallel, assign non-overlapping file or change-area ownership; serialize work whose scopes may collide.
 - Keep nesting to direct children only. Spawned agents must not delegate further.
 - Treat every subagent result as a proposal. The root thread remains accountable for correctness, evidence quality, integration, and user-facing completion.
+
+## Mandatory Sol planning and architecture advisory
+
+- Treat an explicit user request containing `plan`, `planning`, `architecture`, or `architectural` as a direct Sol trigger unless the user is clearly negating that action (for example, “do not make a plan”).
+- Before the root finalizes, presents, approves, or reviews any implementation plan, it must invoke `claudex-sol` for scoped read-only feedback. This is the default even when the root could plan directly.
+- Before the root makes, presents, approves, or reviews any architecture choice, it must invoke `claudex-sol`. An architecture choice is a design decision among credible structural, contract, data-flow, storage, or dependency alternatives; routine mechanical implementation choices do not count.
+- One Sol invocation may cover the plan and architecture choices in the same bounded scope. Invoke Sol again when the plan is materially revised or a new architecture choice is introduced.
+- A trivial direct edit that needs neither a plan nor an architecture choice does not trigger Sol. Do not create a plan solely to trigger delegation.
+- For consequential work, this advisory is additional to and never satisfies or replaces either independent `claudex-sol-review` gate.
 
 ## Consequential-change gate
 
