@@ -89,6 +89,8 @@ The installer runs the non-networked file/configuration check automatically. Run
 
 That check verifies installed files, commands, token/config consistency, private permissions, and Codex agent limits. It does not prove that OAuth is valid or that the model is reachable.
 
+Repository regression checks for launcher, installer, review-gate, telemetry, Codex/Orca sync, routing-policy, and documentation invariants live in `tests/run.sh`; they are for development and release validation, not the normal install smoke test.
+
 After OAuth, run the explicit end-to-end smoke test:
 
 ```bash
@@ -141,7 +143,21 @@ claudex frontend "Implement the requested responsive settings panel and its fron
 claudex sol-review
 ```
 
+### Installed Claude Code subagents
+
+The installer refreshes these source-controlled Claude Code custom agents into `~/.claude/agents`:
+
+| Agent | Model / effort | Permission mode | Role |
+| --- | --- | --- | --- |
+| `claudex-terra` | `gpt-5.5` / medium | default | Default coordinator and implementation agent; `terra` remains a compatibility alias for the main `claudex` route. |
+| `claudex-luna` | `gpt-5.6-luna` / high | plan | Read-only research and data-analysis specialist for broad inventories, maps, structured-data inspection, validation anomalies, naming/log/test/diff classification, and concise evidence summaries. |
+| `claudex-sol` | `gpt-5.6-sol` / medium | plan | Mandatory read-only advisory for implementation plans and architecture choices, plus bounded alternatives and early risk triage. |
+| `claudex-sol-review` | `gpt-5.6-sol` / medium | plan | Read-only consequential-change and final-review gate returning `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`. |
+| `claudex-frontend` | `gpt-5.6-terra` / high | default | Bounded frontend implementer for UI components, styling, accessibility, responsive behavior, visual regressions, frontend tests, and frontend-local assets. |
+
 Luna is for broad, rule-based work: inventories, data-quality checks, naming consistency, log grouping, and parsing/transform plans. It must not edit files or change state. Use deterministic scripts for known bulk transformations.
+
+The installer also syncs Claudex-aligned Codex/Orca subagents from `codex/agents/`: `claudex-luna`, `claudex-sol`, `claudex-sol-review`, and `claudex-frontend` mirror the primary Claudex roles; `default`, `worker`, `worker_high`, `explorer`, `clerical`, and `architect` are compatibility/fallback roles for existing Codex workflows. `codex/AGENTS.md` is the source of truth for their routing policy.
 
 Frontend is a fixed `gpt-5.6-terra` / high-effort implementer for bounded UI components, styling, accessibility, responsive behavior, frontend tests, and directly necessary frontend-local assets. It may not change backend logic, schemas, authentication, public APIs, deployment, or unrelated shared infrastructure; when ownership is unclear, it returns the boundary to the coordinator. The coordinator retains task decomposition, verification synthesis, final integration, and completion reporting. Frontend implementation and tests never replace a required Sol Review or review receipt.
 
@@ -212,6 +228,7 @@ Supported variables:
 | `CLAUDEX_MODEL` | `gpt-5.5` | Main model |
 | `CLAUDEX_EFFORT` | `medium` | Main-session reasoning effort (`xhigh` is rejected) |
 | `CLAUDEX_OPUS_MODEL` | `gpt-5.6-sol` | Custom Opus route shown in `/model` |
+| `CLAUDEX_SONNET_MODEL` | falls back to `CLAUDEX_MODEL` | Custom Sonnet route shown in `/model` |
 | `CLAUDEX_HAIKU_MODEL` | `gpt-5.6-luna` | Lightweight model route |
 | `CLAUDEX_LUNA_MODEL` | `gpt-5.6-luna` | Luna subagent model |
 | `CLAUDEX_SOL_MODEL` | `gpt-5.6-sol` | Sol subagent model |
@@ -328,7 +345,11 @@ claude update
 
 This repository also backs up reusable local workflow assets:
 
-- `codex/` — Claudex-aligned Codex/Orca routing policy, subagents, and skills installed through `./install.sh`; its internal sync step is not a standalone update interface.
+- `codex/` — Claudex-aligned Codex/Orca assets installed through `./install.sh`; its internal sync step is not a standalone update interface.
+  - `codex/AGENTS.md` — global Codex/Orca routing policy matching the Claude Code coordinator rules, review gates, and session-supervision boundaries.
+  - `codex/agents/` — Codex subagent definitions: Claudex roles (`claudex-luna`, `claudex-sol`, `claudex-sol-review`, `claudex-frontend`) plus compatibility/fallback roles (`default`, `worker`, `worker_high`, `explorer`, `clerical`, `architect`).
+  - `codex/skills/` — reusable Codex skills for Claudex routing, ClickUp task lookup/status/sync helpers, smart commits, mirror deployment, iOS simulator verification, Supabase SQL/push workflows, and Orca CLI/runtime configuration.
+- `tests/run.sh` — repository regression test harness covering shell syntax, installation/recovery behavior, routing policy invariants, review receipts, telemetry privacy, usage-efficiency accounting, Codex/Orca sync, and README documentation requirements.
 - `actions/buzz-repo-notifier/` — reusable Buzz repository notification GitHub/Forgejo action source and bundled `dist/` entry point.
 
 ## Security
