@@ -19,6 +19,7 @@ import py_compile, sys
 py_compile.compile(sys.argv[1], cfile=sys.argv[2], doraise=True)
 PY
 test -f "$ROOT_DIR/agents/claudex-terra.md"
+test -f "$ROOT_DIR/agents/claudex-implementer.md"
 test -f "$ROOT_DIR/agents/claudex-luna.md"
 test -f "$ROOT_DIR/agents/claudex-sol.md"
 test -f "$ROOT_DIR/agents/claudex-sol-review.md"
@@ -38,8 +39,16 @@ grep -Fq 'Use whenever a user asks to plan, review a plan, discuss planning, mak
 grep -Fq 'Invoke whenever the root creates, presents, approves, or reviews an implementation plan' "$ROOT_DIR/agents/claudex-sol.md" || fail 'Claude Sol description must define the mandatory plan trigger'
 grep -Fq 'Invoke whenever the root creates, presents, approves, or reviews an implementation plan' "$ROOT_DIR/codex/agents/claudex-sol.toml" || fail 'Codex Sol description must define the mandatory plan trigger'
 grep -Fq 'model: gpt-5.5' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Coordinator must use GPT-5.5'
-grep -Fq 'effort: medium' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Coordinator must use medium effort'
-grep -Fq 'effort: high' "$ROOT_DIR/agents/claudex-luna.md" || fail 'Luna must remain high effort'
+grep -Fq 'effort: low' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Coordinator must use low effort'
+grep -Fq 'model: gpt-5.5' "$ROOT_DIR/agents/claudex-implementer.md" || fail 'Implementer must use GPT-5.5'
+grep -Fq 'effort: medium' "$ROOT_DIR/agents/claudex-implementer.md" || fail 'Implementer must use medium effort'
+grep -Fq 'permissionMode: default' "$ROOT_DIR/agents/claudex-implementer.md" || fail 'Implementer must have implementation permissions'
+grep -Fq 'intended behavior, acceptance criteria, owned and excluded files or change areas' "$ROOT_DIR/agents/claudex-implementer.md" || fail 'Implementer must require a bounded delegation contract'
+grep -Fq 'Do not delegate further, broaden scope' "$ROOT_DIR/agents/claudex-implementer.md" || fail 'Implementer must not delegate or broaden scope'
+grep -Fq 'commit, push, deploy, publish, delete, mutate external systems' "$ROOT_DIR/agents/claudex-implementer.md" || fail 'Implementer must prohibit external and destructive mutations'
+grep -Fq 'Do not monitor, infer lifecycle state, poll, resume, restart, steer, or inject continuation.' "$ROOT_DIR/agents/claudex-implementer.md" || fail 'Implementer must not introduce session supervision'
+grep -Fq 'effort: medium' "$ROOT_DIR/agents/claudex-luna.md" || fail 'Luna must use medium effort'
+grep -Fq 'model_reasoning_effort = "medium"' "$ROOT_DIR/codex/agents/claudex-luna.toml" || fail 'Codex Luna mirror must use medium effort'
 grep -Fq 'effort: medium' "$ROOT_DIR/agents/claudex-sol.md" || fail 'Sol advisory must use medium effort'
 grep -Fq 'effort: medium' "$ROOT_DIR/agents/claudex-sol-review.md" || fail 'Sol Review must use medium effort'
 grep -Fq 'model: gpt-5.6-terra' "$ROOT_DIR/agents/claudex-frontend.md" || fail 'Frontend must use Terra'
@@ -48,40 +57,39 @@ grep -Fq 'permissionMode: default' "$ROOT_DIR/agents/claudex-frontend.md" || fai
 grep -Fq 'Do not change backend logic, schemas, contracts, authentication or authorization' "$ROOT_DIR/agents/claudex-frontend.md" || fail 'Frontend must retain its narrow write boundary'
 grep -Fq 'Do not monitor, infer lifecycle state, poll, resume, restart, steer, or inject continuation.' "$ROOT_DIR/agents/claudex-frontend.md" || fail 'Frontend must not introduce session supervision'
 grep -Fq 'Use `claudex-sol` at medium effort for mandatory scoped feedback' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must define Sol as a mandatory medium-effort advisory'
-grep -Fq 'Treat an explicit user request containing `plan`, `planning`, `architecture`, or `architectural` as a direct Sol trigger' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must treat operative plan and architecture words as direct Sol triggers'
+grep -Fq 'Use `claudex-implementer` at medium effort for substantial bounded non-frontend implementation' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must define the medium implementer boundary'
+grep -Fq 'Only one write-capable agent may own a file or change area at a time.' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must prevent overlapping writers'
+grep -Fq 'Treat an operative user request containing `plan`, `planning`, `architecture`, or `architectural` as a direct Sol trigger' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must treat operative plan and architecture words as direct Sol triggers'
 grep -Fq 'Before the coordinator finalizes, presents, approves, or reviews any implementation plan' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require Sol for every implementation plan'
-grep -Fq 'Before it makes, presents, approves, or reviews any architecture choice' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require Sol for every architecture choice'
-grep -Fq 'Invoke Sol again when the plan is materially revised or a new architecture choice is introduced.' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must re-invoke Sol after material replanning or a new architecture choice'
-grep -Fq 'A trivial direct edit that needs neither a plan nor an architecture choice does not trigger Sol' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must preserve the trivial direct-edit exception'
-grep -Fq 'the Sol advisory is additional to and never satisfies or replaces either independent `claudex-sol-review` gate' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must keep Sol advisory separate from Sol Review gates'
-grep -Fq 'medium-effort `claudex-sol-review` review before the GPT-5.5 coordinator approves the plan or starts implementation' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require medium-effort Sol Review before consequential implementation'
-grep -Fq 'another independent medium-effort `claudex-sol-review` review before it treats the change as complete or merge-ready' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require medium-effort Sol Review before consequential completion'
+grep -Fq 'Before making, presenting, approving, or reviewing an architecture choice' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require Sol for every architecture choice'
+grep -Fq 'invoke Sol again after material replanning or a new architecture choice' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must re-invoke Sol after material replanning or a new architecture choice'
+grep -Fq 'A trivial direct edit needing neither does not trigger Sol' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must preserve the trivial direct-edit exception'
+grep -Fq 'Sol advisory never replaces either review gate' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must keep Sol advisory separate from Sol Review gates'
+grep -Fq 'before the coordinator approves the plan or starts implementation' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require Sol Review before consequential implementation'
+grep -Fq 'another before it treats the change as complete or merge-ready' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require Sol Review before consequential completion'
 grep -Fq 'at most three concurrently' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must cap concurrent subagents at three'
-grep -Fq 'A generic planning agent is not a substitute for Sol review.' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must reject generic planning as a Sol substitute'
-grep -Fq 'Prefer root-cause fixes over workaround layers.' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require root-cause fixes'
-grep -Fq 'Verify actual runtime behavior rather than treating configuration' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require runtime evidence'
-grep -Fq 'Before asking Sol to review a diff, state the intended behavior' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require intent-framed review'
-grep -Fq 'feedback loop that fails on the exact reported symptom' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require exact-symptom reproduction'
-grep -Fq 'derive expected results independently from the implementation under test' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require independent test oracles'
-grep -Fq 'keeps `Behavior/Spec` findings separate from `Repository Standards` findings' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must separate review axes'
-grep -Fq 'Apply YAGNI: implement only the current requirement' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must enforce YAGNI'
-grep -Fq 'Add focused tests for meaningful current behavior' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require focused tests'
+grep -Fq 'Fix root causes rather than adding workaround layers' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require root-cause fixes'
+grep -Fq 'Verify runtime behavior through stable interfaces' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require runtime evidence'
+grep -Fq 'State intended behavior and acceptance criteria before review' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require intent-framed review'
+grep -Fq 'feedback loop for the exact symptom' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require exact-symptom reproduction'
+grep -Fq 'derive expected results independently' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require independent test oracles'
+grep -Fq 'Apply YAGNI' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must enforce YAGNI'
+grep -Fq 'add focused tests for meaningful behavior' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require focused tests'
 grep -Fq 'Match ceremony to task size' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must scale ceremony to task size'
-grep -Fq 'Review feedback must not expand the user' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must prevent review scope creep'
-grep -Fq 'Lead summaries, commit messages, and pull-request descriptions with the user-visible problem and outcome' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require problem-first communication'
-grep -Fq 'Skill descriptions define precise trigger conditions' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must keep skill descriptions trigger-focused'
-grep -Fq 'Sol Review returns PASS, CHANGES_REQUIRED, or BLOCKED' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must reserve verdicts for Sol Review'
-grep -Fq 'Use `claudex-frontend` at high effort for bounded GUI/frontend implementation' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must define Frontend routing'
-grep -Fq 'Frontend implementation and tests never substitute for `claudex-sol-review`.' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must retain Sol Review gates for Frontend work'
-grep -Fq 'maintain a small in-context checklist of the accepted outcomes' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require in-context task tracking'
-grep -Fq 'perform it now rather than responding with an intention to do it' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require available work instead of deferred intentions'
-grep -Fq 'every accepted outcome within that scope is complete with concrete evidence' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require reconciled completion evidence'
-grep -Fq 'it does not waive completing the requested plan, analysis, review, or checkpoint' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require complete read-only scope'
-grep -Fq 'do not persist task or session state, infer lifecycle state, monitor, poll, resume, restart, steer, or inject a continuation' "$ROOT_DIR/prompts/terra-routing.md" || fail 'completion contract must not introduce session supervision'
+grep -Fq 'review-driven scope expansion' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must prevent review scope creep'
+grep -Fq 'lead completion summaries with the user-visible outcome' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require problem-first communication'
+grep -Fq 'Sol Review returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must reserve verdicts for Sol Review'
+grep -Fq 'Use `claudex-frontend` at high effort for a bounded non-overlapping frontend area only' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must define Frontend routing'
+grep -Fq 'Frontend work never substitutes for `claudex-sol-review`.' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must retain Sol Review gates for Frontend work'
+grep -Fq 'maintain a small in-context checklist' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require in-context task tracking'
+grep -Fq 'until every accepted outcome has evidence or a specific blocker' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require reconciled completion evidence'
+grep -Fq 'use `/clear` between unrelated tasks' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must define explicit context clearing guidance'
+grep -Fq 'focused `/compact` at phase boundaries' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must define focused compaction guidance'
+grep -Fq 'Do not use agent teams, automatic classifier agents, persistent task memory, automatic retries, or worktrees by default.' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must reject expensive default orchestration'
 test -f "$ROOT_DIR/docs/claude-code-supervisor.md" || fail 'Claudex must retain its Claude Code session supervision assessment'
-grep -Fq 'Do not infer that a Claude Code/Claudex session is dead because it has been quiet' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must reject silence as a session-death signal'
-grep -Fq 'Do not implement or install session monitoring, lifecycle observation machinery, agent-view polling, process watchers, session-state persistence, automatic resume, restart, or steering from those signals.' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must prohibit unreviewed monitoring and hook-driven lifecycle control'
-grep -Fq 'known opaque session ID, structured authoritative evidence, exclusive per-session ownership or lease' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require reviewed continuation prerequisites'
+grep -Fq 'Do not infer that a Claude Code/Claudex session is dead from silence' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must reject silence as a session-death signal'
+grep -Fq 'Do not implement or install lifecycle monitoring, polling, transcript capture, session persistence, automatic resume/restart, steering, or synthetic continuation.' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must prohibit unreviewed monitoring and hook-driven lifecycle control'
+grep -Fq 'known opaque session ID, authoritative structured evidence, exclusive ownership' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must require reviewed continuation prerequisites'
 grep -Fq 'does not currently autonomously monitor, restart, select, or resume Claude Code sessions.' "$ROOT_DIR/README.md" || fail 'README must preserve the docs-only supervision boundary'
 grep -Fq 'User-supplied Claude Code arguments, including `claudex --resume`, are transparently passed through' "$ROOT_DIR/README.md" || fail 'README must distinguish native user-directed resume from supervisor control'
 grep -Fq 'policy and documentation only' "$ROOT_DIR/docs/claude-code-supervisor.md" || fail 'assessment must retain policy-only status'
@@ -93,6 +101,7 @@ grep -Fq 'Before a resume can even be proposed' "$ROOT_DIR/docs/claude-code-supe
 ! grep -Fq 'session_id' "$ROOT_DIR/bin/claudex" || fail 'launcher must not persist session identifiers'
 ! grep -Fq 'hooks' "$ROOT_DIR/install.sh" || fail 'installer must not install lifecycle hooks'
 grep -Fq 'Use `claudex-sol` at medium effort for mandatory scoped feedback' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must define Sol as a mandatory medium-effort advisory'
+grep -Fq 'Use `claudex-implementer` at medium effort for substantial, bounded non-frontend implementation' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must define the medium implementer boundary'
 grep -Fq 'Treat an explicit user request containing `plan`, `planning`, `architecture`, or `architectural` as a direct Sol trigger' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must treat operative plan and architecture words as direct Sol triggers'
 grep -Fq 'Before you finalize, present, approve, or review any implementation plan' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must require Sol for every implementation plan'
 grep -Fq 'Before you make, present, approve, or review any architecture choice' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Terra agent must require Sol for every architecture choice'
@@ -120,7 +129,7 @@ grep -Fq 'carries available investigation, implementation, validation, and integ
 grep -Fq 'limits the requested scope; Terra still completes that requested analysis or checkpoint with the available evidence' "$ROOT_DIR/README.md" || fail 'README must describe complete limited-scope work'
 grep -Fq 'not lifecycle automation: it adds no hooks, polling, process watching, task/session persistence, automatic resume/restart, session selection, or synthetic continuation' "$ROOT_DIR/README.md" || fail 'README must distinguish completion discipline from session supervision'
 grep -Fq 'account/rateLimits/read' "$ROOT_DIR/README.md" || fail 'README must document automatic Codex usage percentage reads'
-grep -Fq 'explicitly user-invoked retrospective usage-efficiency snapshots' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must authorize only narrow usage-efficiency accounting'
+grep -Fq 'Opt-in telemetry may record only content-free aggregate launcher or quota-window metrics' "$ROOT_DIR/prompts/terra-routing.md" || fail 'routing prompt must authorize only narrow usage-efficiency accounting'
 grep -Fq 'claudex-usage-efficiency` is a separate, explicitly user-invoked retrospective accounting tool' "$ROOT_DIR/docs/claude-code-supervisor.md" || fail 'supervision docs must authorize the usage-efficiency boundary'
 python3 - "$ROOT_DIR/bin/claudex-usage-efficiency" "$TMP_DIR/claudex-usage-efficiency.pyc" <<'PY'
 import py_compile, sys
@@ -242,7 +251,7 @@ env \
 INSTALLED_PROMPT="$INSTALL_XDG/claudex/terra-routing.md"
 INSTALLED_AGENT_HOME="$INSTALL_HOME/.claude/agents"
 cmp -s "$ROOT_DIR/prompts/terra-routing.md" "$INSTALLED_PROMPT" || fail 'install.sh must install the current routing prompt'
-for agent in claudex-terra claudex-luna claudex-frontend claudex-sol claudex-sol-review; do
+for agent in claudex-terra claudex-implementer claudex-luna claudex-frontend claudex-sol claudex-sol-review; do
   cmp -s "$ROOT_DIR/agents/$agent.md" "$INSTALLED_AGENT_HOME/$agent.md" || fail "install.sh must install $agent"
 done
 test -x "$INSTALL_HOME/.local/bin/claudex-usage-efficiency" || fail 'install.sh must install the usage-efficiency utility'
@@ -291,7 +300,7 @@ env \
   CLAUDEX_INSTALL_MODE=configure-only \
   "$ROOT_DIR/install.sh" --skip-login >/dev/null
 cmp -s "$ROOT_DIR/prompts/terra-routing.md" "$INSTALLED_PROMPT" || fail 'install.sh must refresh the installed routing prompt on reinstall'
-for agent in claudex-terra claudex-luna claudex-frontend claudex-sol claudex-sol-review; do
+for agent in claudex-terra claudex-implementer claudex-luna claudex-frontend claudex-sol claudex-sol-review; do
   cmp -s "$ROOT_DIR/agents/$agent.md" "$INSTALLED_AGENT_HOME/$agent.md" || fail "install.sh must refresh $agent on reinstall"
 done
 cmp -s "$ROOT_DIR/codex/AGENTS.md" "$INSTALL_HOME/.codex/AGENTS.md" || fail 'install.sh must refresh repo-backed Codex policy'
@@ -654,6 +663,9 @@ for invocation in \
   expect_fail env "${XHIGH_TEST_ENV[@]}" bash -c "$invocation"
   [[ ! -s "$XHIGH_CALL_LOG" ]] || fail "frontend overrides must fail before proxy or Claude invocation: $invocation"
 done
+DEFAULT_EFFORT_ARGS="$TMP_DIR/default-effort-args"
+(cd "$REPO" && env "${CLAUDEX_TEST_ENV[@]}" MOCK_CLAUDE_ARGS_LOG="$DEFAULT_EFFORT_ARGS" "$ROOT_DIR/bin/claudex" --print 'default effort fixture' >/dev/null)
+grep -Fxq 'low' "$DEFAULT_EFFORT_ARGS" || fail 'default coordinator must use low effort'
 PERMITTED_EFFORT_ARGS="$TMP_DIR/permitted-effort-args"
 (cd "$REPO" && env "${CLAUDEX_TEST_ENV[@]}" MOCK_CLAUDE_ARGS_LOG="$PERMITTED_EFFORT_ARGS" "$ROOT_DIR/bin/claudex" terra --effort medium --print 'permitted effort fixture' >/dev/null)
 grep -Fxq 'medium' "$PERMITTED_EFFORT_ARGS" || fail 'non-xhigh effort arguments must pass through unchanged'
@@ -701,7 +713,7 @@ assert {record['event'] for record in records} >= {'proxy_ready', 'launch_comple
 launch = next(record for record in reversed(records) if record['event'] == 'launch_completed')
 assert launch['mode'] == 'luna', launch
 assert launch['route'] == 'custom', launch
-assert launch['effort'] == 'high', launch
+assert launch['effort'] == 'medium', launch
 assert launch['autocompact'] == 'custom', launch
 assert launch['launcher_revision'] == 2, launch
 assert launch['exit_code'] == 0 and launch['elapsed_ms'] >= 0, launch
@@ -758,9 +770,13 @@ for line in open(sys.argv[1]):
     json.loads(line)
 PY
 
+LUNA_ARGS="$TMP_DIR/luna-args"
 SOL_ADVISORY_ARGS="$TMP_DIR/sol-advisory-args"
 FRONTEND_ARGS="$TMP_DIR/frontend-args"
 SOL_REVIEW_ARGS="$TMP_DIR/sol-review-args"
+(cd "$REPO" && env "${CLAUDEX_TEST_ENV[@]}" MOCK_CLAUDE_ARGS_LOG="$LUNA_ARGS" "$ROOT_DIR/bin/claudex" luna 'research fixture' >/dev/null)
+grep -Fxq 'claudex-luna' "$LUNA_ARGS" || fail 'Luna must select claudex-luna'
+grep -Fxq 'medium' "$LUNA_ARGS" || fail 'Luna must use medium effort'
 (cd "$REPO" && env "${CLAUDEX_TEST_ENV[@]}" MOCK_CLAUDE_ARGS_LOG="$SOL_ADVISORY_ARGS" "$ROOT_DIR/bin/claudex" sol 'advisory fixture' >/dev/null)
 grep -Fxq -- '--agent' "$SOL_ADVISORY_ARGS" || fail 'Sol advisory must select a custom agent'
 grep -Fxq 'claudex-sol' "$SOL_ADVISORY_ARGS" || fail 'Sol advisory must select claudex-sol'

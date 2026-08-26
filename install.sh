@@ -163,6 +163,7 @@ configure_claudex() {
   install -m 755 "$ROOT_DIR/bin/claudex-usage-efficiency" "$BIN_HOME/claudex-usage-efficiency"
   install -m 644 "$ROOT_DIR/prompts/terra-routing.md" "$CONFIG_HOME/terra-routing.md"
   install -m 644 "$ROOT_DIR/agents/claudex-terra.md" "$AGENT_HOME/claudex-terra.md"
+  install -m 644 "$ROOT_DIR/agents/claudex-implementer.md" "$AGENT_HOME/claudex-implementer.md"
   install -m 644 "$ROOT_DIR/agents/claudex-luna.md" "$AGENT_HOME/claudex-luna.md"
   install -m 644 "$ROOT_DIR/agents/claudex-sol.md" "$AGENT_HOME/claudex-sol.md"
   install -m 644 "$ROOT_DIR/agents/claudex-sol-review.md" "$AGENT_HOME/claudex-sol-review.md"
@@ -188,6 +189,7 @@ managed_targets() {
     "$BIN_HOME/claudex-usage-efficiency" \
     "$CONFIG_HOME/terra-routing.md" \
     "$AGENT_HOME/claudex-terra.md" \
+    "$AGENT_HOME/claudex-implementer.md" \
     "$AGENT_HOME/claudex-luna.md" \
     "$AGENT_HOME/claudex-sol.md" \
     "$AGENT_HOME/claudex-sol-review.md" \
@@ -279,9 +281,9 @@ main() {
 
   printf '\nClaudex files installed and locally verified.\n'
   printf 'Backup ID: %s\n' "$BACKUP_ID"
-  printf 'Default model: gpt-5.5 (medium effort)\n'
-  printf 'Default effort: medium\n'
-  printf 'Installed agents: GPT-5.5 coordinator (Terra alias), Luna data/research, Frontend implementer, Sol advisory, Sol Review gate\n'
+  printf 'Default model: gpt-5.5 (low effort)\n'
+  printf 'Default effort: low\n'
+  printf 'Installed agents: GPT-5.5 coordinator (Terra alias), GPT-5.5 Implementer, Luna data/research, Frontend implementer, Sol advisory, Sol Review gate\n'
   printf 'Start it with: claudex\n'
   if [[ "$SKIP_LOGIN" == "1" ]]; then
     printf 'OAuth was skipped; Claudex is not yet verified end to end.\n'
