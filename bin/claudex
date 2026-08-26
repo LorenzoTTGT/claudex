@@ -6,7 +6,7 @@ CONFIG_FILE="${CLAUDEX_PROXY_CONFIG:-$CONFIG_HOME/cliproxyapi.yaml}"
 TOKEN_FILE="${CLAUDEX_TOKEN_FILE:-$CONFIG_HOME/token}"
 BASE_URL="${CLAUDEX_BASE_URL:-http://127.0.0.1:8317}"
 MODEL="${CLAUDEX_MODEL:-gpt-5.5}"
-EFFORT="${CLAUDEX_EFFORT:-medium}"
+EFFORT="${CLAUDEX_EFFORT:-low}"
 AUTOCOMPACT="${CLAUDEX_AUTOCOMPACT:-220k}"
 LUNA_MODEL="${CLAUDEX_LUNA_MODEL:-gpt-5.6-luna}"
 SOL_MODEL="${CLAUDEX_SOL_MODEL:-gpt-5.6-sol}"
@@ -254,7 +254,7 @@ PY
 }
 
 case "${1:-}" in
-  luna) TELEMETRY_MODE="luna"; TELEMETRY_ROUTE="$(telemetry_route "$LUNA_MODEL")"; TELEMETRY_EFFORT="high" ;;
+  luna) TELEMETRY_MODE="luna"; TELEMETRY_ROUTE="$(telemetry_route "$LUNA_MODEL")"; TELEMETRY_EFFORT="medium" ;;
   sol) TELEMETRY_MODE="sol"; TELEMETRY_ROUTE="$(telemetry_route "$SOL_MODEL")"; TELEMETRY_EFFORT="medium" ;;
   frontend) TELEMETRY_MODE="frontend"; TELEMETRY_ROUTE="frontend"; TELEMETRY_EFFORT="high" ;;
   sol-review) TELEMETRY_MODE="sol-review"; TELEMETRY_ROUTE="$(telemetry_route "$SOL_MODEL")"; TELEMETRY_EFFORT="medium" ;;
@@ -334,7 +334,7 @@ run_terra() {
 run_luna() {
   [[ $# -gt 0 ]] || { echo 'Claudex: luna requires a task prompt.' >&2; exit 2; }
   reject_role_effort_override "$@"
-  claude_command --agent claudex-luna --model "$LUNA_MODEL" --effort high --permission-mode plan --autocompact "$AUTOCOMPACT" "$@"
+  claude_command --agent claudex-luna --model "$LUNA_MODEL" --effort medium --permission-mode plan --autocompact "$AUTOCOMPACT" "$@"
 }
 run_sol() {
   [[ $# -gt 0 ]] || { echo 'Claudex: sol requires a task prompt.' >&2; exit 2; }

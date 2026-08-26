@@ -37,7 +37,7 @@ for path, expected in ((sys.argv[1], 0o700), (sys.argv[2], 0o600), (sys.argv[3],
 PY
 
 cmp -s "$ROOT_DIR/prompts/terra-routing.md" "$CONFIG_HOME/terra-routing.md" || fail "routing prompt does not match the repository source"
-for agent in claudex-terra claudex-luna claudex-sol claudex-sol-review claudex-frontend; do
+for agent in claudex-terra claudex-implementer claudex-luna claudex-sol claudex-sol-review claudex-frontend; do
   cmp -s "$ROOT_DIR/agents/$agent.md" "$AGENT_HOME/$agent.md" || fail "Claude agent $agent does not match the repository source"
 done
 verify_codex_tree() {
