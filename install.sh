@@ -283,7 +283,7 @@ main() {
   printf 'Backup ID: %s\n' "$BACKUP_ID"
   printf 'Default model: gpt-5.5 (low effort)\n'
   printf 'Default effort: low\n'
-  printf 'Installed agents: GPT-5.5 coordinator (Terra alias), GPT-5.5 Implementer, Luna data/research, Frontend implementer, Sol advisory, Sol Review gate\n'
+  printf 'Installed agents: GPT-5.5 coordinator (Terra alias), GPT-5.6 Sol low Implementer, Luna data/research, Frontend implementer, Sol advisory, Sol Review gate\n'
   printf 'Start it with: claudex\n'
   if [[ "$SKIP_LOGIN" == "1" ]]; then
     printf 'OAuth was skipped; Claudex is not yet verified end to end.\n'
