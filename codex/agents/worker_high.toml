@@ -1,6 +1,6 @@
 name = "worker_high"
 description = "Compatibility alias for complex or failed bounded implementation attempts when no named Claudex role fits; use sparingly."
-model = "gpt-5.5"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 
 developer_instructions = """

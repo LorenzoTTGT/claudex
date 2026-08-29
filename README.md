@@ -4,8 +4,8 @@ Claudex launches **Claude Code** through a local [CLIProxyAPI](https://github.co
 
 Defaults:
 
-- Coordinator: `gpt-5.5` / low — permanent coordinator, routine implementer, and final integrator (`terra` remains a compatibility alias)
-- Implementer: `gpt-5.5` / medium — bounded substantial non-frontend implementation
+- Coordinator: `gpt-5.5` / low — permanent coordinator, small-edit executor, and final integrator (`terra` remains a compatibility alias)
+- Implementer: `gpt-5.6-sol` / low — bounded substantial non-frontend implementation
 - Luna: `gpt-5.6-luna` / medium — read-only research and data-operations worker
 - Frontend: `gpt-5.6-terra` / high — bounded GUI/frontend implementation and code-generation worker
 - Sol advisory: `gpt-5.6-sol` / medium — read-only architecture advice and early risk triage
@@ -150,8 +150,8 @@ The installer refreshes these source-controlled Claude Code custom agents into `
 
 | Agent | Model / effort | Permission mode | Role |
 | --- | --- | --- | --- |
-| `claudex-terra` | `gpt-5.5` / low | default | Default coordinator, routine implementer, and final integrator; `terra` remains a compatibility alias for the main `claudex` route. |
-| `claudex-implementer` | `gpt-5.5` / medium | default | Substantial, bounded non-frontend implementation after behavior, acceptance criteria, exclusive ownership, relevant Sol decisions, and checks are explicit. |
+| `claudex-terra` | `gpt-5.5` / low | default | Default coordinator, small-edit executor, verification synthesizer, and final integrator; `terra` remains a compatibility alias for the main `claudex` route. |
+| `claudex-implementer` | `gpt-5.6-sol` / low | default | Substantial, bounded non-frontend implementation after behavior, acceptance criteria, exclusive ownership, relevant Sol decisions when applicable, and checks are explicit. |
 | `claudex-luna` | `gpt-5.6-luna` / medium | plan | Read-only research and data-analysis specialist for broad inventories, maps, structured-data inspection, validation anomalies, naming/log/test/diff classification, and concise evidence summaries. |
 | `claudex-sol` | `gpt-5.6-sol` / medium | plan | Mandatory read-only advisory for implementation plans and architecture choices, plus bounded alternatives and early risk triage. |
 | `claudex-sol-review` | `gpt-5.6-sol` / medium | plan | Read-only consequential-change and final-review gate returning `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`. |
@@ -159,15 +159,15 @@ The installer refreshes these source-controlled Claude Code custom agents into `
 
 Luna is for broad, rule-based work: inventories, data-quality checks, naming consistency, log grouping, and parsing/transform plans. It must not edit files or change state. Use deterministic scripts for known bulk transformations.
 
-Implementer is for substantial bounded non-frontend coding, coupled components, reproducible difficult bugs, or one failed low-effort attempt. Ambiguity and architecture choices must be resolved before delegation. The coordinator supplies intended behavior, acceptance criteria, owned and excluded files or change areas, relevant Sol decisions, and required checks; only one writer may own an area at a time. Implementer cannot delegate, broaden scope, commit, push, deploy, delete, mutate external systems, or replace coordinator diff inspection, independent verification, final integration, and completion reporting. Consequential implementation requires the existing pre-implementation Sol and Sol Review gates and remains subject to final Sol Review.
+Implementer is a GPT-5.6 Sol / low-effort role for substantial bounded non-frontend coding, coupled components, reproducible difficult bugs, or one failed coordinator attempt. Ambiguity and architecture choices must be resolved before delegation. The coordinator supplies intended behavior, acceptance criteria, owned and excluded files or change areas, relevant Sol decisions when applicable, and required checks; only one writer may own an area at a time. Implementer cannot delegate, broaden scope, commit, push, deploy, delete, mutate external systems, or replace coordinator diff inspection, independent verification, final integration, and completion reporting. Consequential implementation requires the existing pre-implementation Sol and risk-based Sol Review gates and remains subject to final Sol Review; routine low-risk implementation by this Sol-backed implementer does not itself create a Sol Review requirement.
 
 The installer also syncs Claudex-aligned Codex/Orca subagents from `codex/agents/`: `claudex-luna`, `claudex-sol`, `claudex-sol-review`, and `claudex-frontend` mirror the primary Claudex roles; `default`, `worker`, `worker_high`, `explorer`, `clerical`, and `architect` are compatibility/fallback roles for existing Codex workflows. `codex/AGENTS.md` is the source of truth for their routing policy.
 
 Frontend is a fixed `gpt-5.6-terra` / high-effort implementer for bounded UI components, styling, accessibility, responsive behavior, frontend tests, and directly necessary frontend-local assets. It may not change backend logic, schemas, authentication, public APIs, deployment, or unrelated shared infrastructure; when ownership is unclear, it returns the boundary to the coordinator. The coordinator retains task decomposition, verification synthesis, final integration, and completion reporting. Frontend implementation and tests never replace a required Sol Review or review receipt.
 
-Use medium-effort Sol for mandatory scoped feedback whenever the coordinator creates, presents, approves, or reviews an implementation plan or makes, presents, approves, or reviews an architecture choice. An operative user mention of `plan`, `planning`, `architecture`, or `architectural` is a direct trigger unless clearly negated. An architecture choice means a decision among credible structural, contract, data-flow, storage, or dependency alternatives, not a routine mechanical implementation choice. One Sol invocation may cover a plan and its architecture choices; materially revising the plan or introducing a new architecture choice requires another invocation. A trivial direct edit needing neither does not trigger Sol, and work should not be artificially planned just to trigger delegation.
+Use medium-effort Sol for scoped feedback whenever the coordinator creates, presents, approves, or reviews a non-trivial implementation plan or makes, presents, approves, or reviews an architecture choice. Reserve high-effort Sol passes for major planning, security-sensitive architecture, migrations, public contracts, release blockers, or unresolved disagreement. An operative user mention of `plan`, `planning`, `architecture`, or `architectural` is a direct trigger unless clearly negated. An architecture choice means a decision among credible structural, contract, data-flow, storage, or dependency alternatives, not a routine mechanical implementation choice. One Sol invocation may cover a plan and its architecture choices; materially revising the plan or introducing a new architecture choice requires another invocation. A trivial direct edit needing neither does not trigger Sol, and work should not be artificially planned just to trigger delegation.
 
-Sol Review returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`; it recommends and the GPT-5.5 coordinator implements. For consequential work, the Sol advisory is additional to and never replaces the independent medium-effort Sol Review required before approving the plan or starting implementation, or the second review required before treating the work as complete or merge-ready. Keep coordinator ↔ Sol Review correction loops to two; surface disagreements after that.
+Sol Review returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`; it recommends and the GPT-5.5 coordinator implements. Trigger Sol Review by consequence, sensitivity, substantiality, release criticality, or experimental/non-primary implementation risk rather than model identity alone. For consequential work, the Sol advisory and GPT-5.6 Sol-backed implementation are additional to and never replace the independent medium-effort Sol Review required before approving the plan or starting implementation, or the second review required before treating the work as complete or merge-ready. Tiny, bounded, reversible, non-sensitive edits with clear validation do not need Sol Review. Keep coordinator ↔ Sol Review correction loops to two; surface disagreements after that.
 
 Claudex prefers root-cause fixes over workaround layers, verifies actual runtime behavior instead of trusting configuration or agent claims, and states intended behavior before Sol reviews a diff so findings stay tied to the requested outcome rather than generic style preferences.
 
@@ -175,7 +175,7 @@ For difficult bugs and performance regressions, Claudex first seeks a runnable f
 
 Claudex applies YAGNI, avoids speculative compatibility and fallback layers, uses focused tests for meaningful current behavior, and matches planning, delegation, and verification ceremony to task size. Review feedback cannot expand the original goal. Human-facing summaries lead with the problem and outcome rather than an implementation inventory. Persistent global guidance requires repeated observed failure, and skill descriptions stay focused on trigger conditions.
 
-Implementer, Luna, Frontend, Sol advisory, and Sol Review are ordinary Claude Code custom agents with fixed `medium`, `medium`, `high`, `medium`, and `medium` effort respectively. Frontend's agent, model, and effort are intentionally fixed and cannot be overridden from its command. Existing users must rerun the installer after updating Claudex, then restart Claude Code or use `/agents` to reload the definitions.
+Implementer, Luna, Frontend, Sol advisory, and Sol Review are ordinary Claude Code custom agents with fixed `low`, `medium`, `high`, `medium`, and `medium` effort respectively. Implementer uses GPT-5.6 Sol at low effort for bounded non-frontend implementation; Sol advisory and Sol Review remain read-only roles. Frontend's agent, model, and effort are intentionally fixed and cannot be overridden from its command. Existing users must rerun the installer after updating Claudex, then restart Claude Code or use `/agents` to reload the definitions.
 
 ### Context and cost discipline
 
@@ -249,7 +249,7 @@ Supported variables:
 | `CLAUDEX_PROXY_CONFIG` | `~/.config/claudex/cliproxyapi.yaml` | Proxy configuration |
 | `CLAUDEX_TOKEN_FILE` | `~/.config/claudex/token` | Local proxy token |
 
-`CLAUDEX_EFFORT` and a compatibility `terra` CLI `--effort` argument control only the main GPT-5.5 session. Luna, Frontend, Sol advisory, and Sol Review have fixed role efforts (`medium`, `high`, `medium`, and `medium`). Frontend also fixes its agent and model to `claudex-frontend` and `gpt-5.6-terra`; its command rejects agent, model, and effort overrides. `xhigh` is unsupported and rejected before Claudex starts or probes the proxy.
+`CLAUDEX_EFFORT` and a compatibility `terra` CLI `--effort` argument control only the main GPT-5.5 session. Implementer, Luna, Frontend, Sol advisory, and Sol Review have fixed role efforts (`low`, `medium`, `high`, `medium`, and `medium`). Frontend also fixes its agent and model to `claudex-frontend` and `gpt-5.6-terra`; its command rejects agent, model, and effort overrides. `xhigh` is unsupported and rejected before Claudex starts or probes the proxy.
 
 Claudex bypasses Claude Code permission prompts by default. Re-enable them for one session:
 
