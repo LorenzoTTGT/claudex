@@ -5,7 +5,7 @@ CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/claudex"
 CONFIG_FILE="${CLAUDEX_PROXY_CONFIG:-$CONFIG_HOME/cliproxyapi.yaml}"
 TOKEN_FILE="${CLAUDEX_TOKEN_FILE:-$CONFIG_HOME/token}"
 BASE_URL="${CLAUDEX_BASE_URL:-http://127.0.0.1:8317}"
-MODEL="${CLAUDEX_MODEL:-gpt-5.5}"
+MODEL="${CLAUDEX_MODEL:-gpt-5.6-sol}"
 EFFORT="${CLAUDEX_EFFORT:-low}"
 AUTOCOMPACT="${CLAUDEX_AUTOCOMPACT:-220k}"
 LUNA_MODEL="${CLAUDEX_LUNA_MODEL:-gpt-5.6-luna}"
@@ -33,7 +33,7 @@ usage() {
   cat <<'EOF'
 Usage: claudex [terra|luna|sol|frontend|sol-review|review-gate|install-hook] [arguments]
 
-  claudex [args...]       Start the GPT-5.5 coordinator session.
+  claudex [args...]       Start the GPT-5.6 Sol coordinator session.
   claudex terra [args...] Backward-compatible coordinator alias.
   claudex luna <task>     Run a read-only Luna research/data task.
   claudex sol <task>      Run a medium-effort read-only Sol architecture advisory.

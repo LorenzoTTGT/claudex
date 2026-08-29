@@ -38,7 +38,7 @@ grep -Fq 'Before the root finalizes, presents, approves, or reviews any non-triv
 grep -Fq 'Use whenever a user asks to plan, review a plan, discuss planning, make or review an architecture choice' "$ROOT_DIR/codex/skills/claudex-routing/SKILL.md" || fail 'routing skill description must trigger on plan and architecture requests'
 grep -Fq 'Invoke for non-trivial implementation plans' "$ROOT_DIR/agents/claudex-sol.md" || fail 'Claude Sol description must define the non-trivial plan trigger'
 grep -Fq 'Invoke for non-trivial implementation plans' "$ROOT_DIR/codex/agents/claudex-sol.toml" || fail 'Codex Sol description must define the non-trivial plan trigger'
-grep -Fq 'model: gpt-5.5' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Coordinator must use GPT-5.5'
+grep -Fq 'model: gpt-5.6-sol' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Coordinator must use GPT-5.6 Sol'
 grep -Fq 'effort: low' "$ROOT_DIR/agents/claudex-terra.md" || fail 'Coordinator must use low effort'
 grep -Fq 'model: gpt-5.6-sol' "$ROOT_DIR/agents/claudex-implementer.md" || fail 'Implementer must use GPT-5.6 Sol'
 grep -Fq 'effort: low' "$ROOT_DIR/agents/claudex-implementer.md" || fail 'Implementer must use low effort'

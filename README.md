@@ -4,7 +4,7 @@ Claudex launches **Claude Code** through a local [CLIProxyAPI](https://github.co
 
 Defaults:
 
-- Coordinator: `gpt-5.5` / low — permanent coordinator, small-edit executor, and final integrator (`terra` remains a compatibility alias)
+- Coordinator: `gpt-5.6-sol` / low — permanent coordinator, small-edit executor, and final integrator (`terra` remains a compatibility alias)
 - Implementer: `gpt-5.6-sol` / low — bounded substantial non-frontend implementation
 - Luna: `gpt-5.6-luna` / medium — read-only research and data-operations worker
 - Frontend: `gpt-5.6-terra` / high — bounded GUI/frontend implementation and code-generation worker
@@ -128,7 +128,7 @@ Direct role commands are optional and useful when the human wants to force a bou
 
 ## Agent workflow
 
-`claudex` keeps the native Claude Code main agent on GPT-5.5/low by default. It appends the source-controlled routing policy from `prompts/terra-routing.md` rather than replacing Claude Code’s main system prompt, so native planning and built-in delegation remain available. Terra-named files and commands remain compatibility aliases. Set `CLAUDEX_EFFORT=medium` or pass `--effort medium` when one stronger root should own cross-cutting or iterative work. The policy delegates only bounded work:
+`claudex` keeps the native Claude Code main agent on GPT-5.6 Sol/low by default. It appends the source-controlled routing policy from `prompts/terra-routing.md` rather than replacing Claude Code’s main system prompt, so native planning and built-in delegation remain available. Terra-named files and commands remain compatibility aliases. Set `CLAUDEX_EFFORT=medium` or pass `--effort medium` when one stronger root should own cross-cutting or iterative work. The policy delegates only bounded work:
 
 ```bash
 # Read-only repository/data investigation; returns compressed findings.
@@ -150,7 +150,7 @@ The installer refreshes these source-controlled Claude Code custom agents into `
 
 | Agent | Model / effort | Permission mode | Role |
 | --- | --- | --- | --- |
-| `claudex-terra` | `gpt-5.5` / low | default | Default coordinator, small-edit executor, verification synthesizer, and final integrator; `terra` remains a compatibility alias for the main `claudex` route. |
+| `claudex-terra` | `gpt-5.6-sol` / low | default | Default coordinator, small-edit executor, verification synthesizer, and final integrator; `terra` remains a compatibility alias for the main `claudex` route. |
 | `claudex-implementer` | `gpt-5.6-sol` / low | default | Substantial, bounded non-frontend implementation after behavior, acceptance criteria, exclusive ownership, relevant Sol decisions when applicable, and checks are explicit. |
 | `claudex-luna` | `gpt-5.6-luna` / medium | plan | Read-only research and data-analysis specialist for broad inventories, maps, structured-data inspection, validation anomalies, naming/log/test/diff classification, and concise evidence summaries. |
 | `claudex-sol` | `gpt-5.6-sol` / medium | plan | Mandatory read-only advisory for implementation plans and architecture choices, plus bounded alternatives and early risk triage. |
@@ -167,7 +167,7 @@ Frontend is a fixed `gpt-5.6-terra` / high-effort implementer for bounded UI com
 
 Use medium-effort Sol for scoped feedback whenever the coordinator creates, presents, approves, or reviews a non-trivial implementation plan or makes, presents, approves, or reviews an architecture choice. Reserve high-effort Sol passes for major planning, security-sensitive architecture, migrations, public contracts, release blockers, or unresolved disagreement. An operative user mention of `plan`, `planning`, `architecture`, or `architectural` is a direct trigger unless clearly negated. An architecture choice means a decision among credible structural, contract, data-flow, storage, or dependency alternatives, not a routine mechanical implementation choice. One Sol invocation may cover a plan and its architecture choices; materially revising the plan or introducing a new architecture choice requires another invocation. A trivial direct edit needing neither does not trigger Sol, and work should not be artificially planned just to trigger delegation.
 
-Sol Review returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`; it recommends and the GPT-5.5 coordinator implements. Trigger Sol Review by consequence, sensitivity, substantiality, release criticality, or experimental/non-primary implementation risk rather than model identity alone. For consequential work, the Sol advisory and GPT-5.6 Sol-backed implementation are additional to and never replace the independent medium-effort Sol Review required before approving the plan or starting implementation, or the second review required before treating the work as complete or merge-ready. Tiny, bounded, reversible, non-sensitive edits with clear validation do not need Sol Review. Keep coordinator ↔ Sol Review correction loops to two; surface disagreements after that.
+Sol Review returns `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`; it recommends and the GPT-5.6 Sol coordinator implements. Trigger Sol Review by consequence, sensitivity, substantiality, release criticality, or experimental/non-primary implementation risk rather than model identity alone. For consequential work, the Sol advisory and GPT-5.6 Sol-backed implementation are additional to and never replace the independent medium-effort Sol Review required before approving the plan or starting implementation, or the second review required before treating the work as complete or merge-ready. Tiny, bounded, reversible, non-sensitive edits with clear validation do not need Sol Review. Keep coordinator ↔ Sol Review correction loops to two; surface disagreements after that.
 
 Claudex prefers root-cause fixes over workaround layers, verifies actual runtime behavior instead of trusting configuration or agent claims, and states intended behavior before Sol reviews a diff so findings stay tied to the requested outcome rather than generic style preferences.
 
@@ -235,7 +235,7 @@ Supported variables:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `CLAUDEX_MODEL` | `gpt-5.5` | Main model |
+| `CLAUDEX_MODEL` | `gpt-5.6-sol` | Main model |
 | `CLAUDEX_EFFORT` | `low` | Main-session reasoning effort (`xhigh` is rejected); use `medium` when one stronger root should own cross-cutting or iterative work |
 | `CLAUDEX_OPUS_MODEL` | `gpt-5.6-sol` | Custom Opus route shown in `/model` |
 | `CLAUDEX_SONNET_MODEL` | falls back to `CLAUDEX_MODEL` | Custom Sonnet route shown in `/model` |
@@ -249,7 +249,7 @@ Supported variables:
 | `CLAUDEX_PROXY_CONFIG` | `~/.config/claudex/cliproxyapi.yaml` | Proxy configuration |
 | `CLAUDEX_TOKEN_FILE` | `~/.config/claudex/token` | Local proxy token |
 
-`CLAUDEX_EFFORT` and a compatibility `terra` CLI `--effort` argument control only the main GPT-5.5 session. Implementer, Luna, Frontend, Sol advisory, and Sol Review have fixed role efforts (`low`, `medium`, `high`, `medium`, and `medium`). Frontend also fixes its agent and model to `claudex-frontend` and `gpt-5.6-terra`; its command rejects agent, model, and effort overrides. `xhigh` is unsupported and rejected before Claudex starts or probes the proxy.
+`CLAUDEX_EFFORT` and a compatibility `terra` CLI `--effort` argument control only the main GPT-5.6 Sol session. Implementer, Luna, Frontend, Sol advisory, and Sol Review have fixed role efforts (`low`, `medium`, `high`, `medium`, and `medium`). Frontend also fixes its agent and model to `claudex-frontend` and `gpt-5.6-terra`; its command rejects agent, model, and effort overrides. `xhigh` is unsupported and rejected before Claudex starts or probes the proxy.
 
 Claudex bypasses Claude Code permission prompts by default. Re-enable them for one session:
 
