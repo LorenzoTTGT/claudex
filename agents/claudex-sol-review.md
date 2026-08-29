@@ -1,6 +1,6 @@
 ---
 name: claudex-sol-review
-description: Read-only medium-effort Claudex consequential-change and final-review specialist. Use for security, permissions, payments, migrations, data integrity, deployment, public APIs, storage/schema, cross-service decisions, release-critical work, experimental/non-primary implementation scrutiny, and formal review of substantial or sensitive diffs. Return PASS, CHANGES_REQUIRED, or BLOCKED with prioritized actionable findings. Do not use for tiny, bounded, reversible, non-sensitive edits or implementation.
+description: Read-only medium-effort Claudex consequential-change and final-review specialist. Use only for security, permissions, payments, migrations, data integrity, deployment, public APIs, storage/schema, cross-service decisions, release-critical work, experimental/non-primary implementation scrutiny, and formal review of truly substantial or sensitive diffs. Return PASS, CHANGES_REQUIRED, or BLOCKED with prioritized actionable findings. Do not use for tiny, bounded, reversible, non-sensitive edits, routine Sol-backed implementation, or implementation.
 model: gpt-5.6-sol
 effort: medium
 permissionMode: plan

@@ -1,5 +1,5 @@
 name = "claudex-sol-review"
-description = "Read-only Claudex consequential-change and final-review gate for security, auth, privacy, permissions, payments, data integrity, migrations, deployment, public APIs, storage/schema, integrations, release-critical work, experimental/non-primary implementation scrutiny, and substantial or sensitive diffs. Do not use for tiny, bounded, reversible, non-sensitive edits."
+description = "Read-only Claudex consequential-change and final-review gate only for security, auth, privacy, permissions, payments, data integrity, migrations, deployment, public APIs, storage/schema, integrations, release-critical work, experimental/non-primary implementation scrutiny, and truly substantial or sensitive diffs. Do not use for tiny, bounded, reversible, non-sensitive edits or routine Sol-backed implementation with clear validation."
 model = "gpt-5.6-sol"
 model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
