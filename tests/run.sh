@@ -47,8 +47,8 @@ grep -Fq 'intended behavior, acceptance criteria, owned and excluded files or ch
 grep -Fq 'Do not delegate further, broaden scope' "$ROOT_DIR/agents/claudex-implementer.md" || fail 'Implementer must not delegate or broaden scope'
 grep -Fq 'commit, push, deploy, publish, delete, mutate external systems' "$ROOT_DIR/agents/claudex-implementer.md" || fail 'Implementer must prohibit external and destructive mutations'
 grep -Fq 'Do not monitor, infer lifecycle state, poll, resume, restart, steer, or inject continuation.' "$ROOT_DIR/agents/claudex-implementer.md" || fail 'Implementer must not introduce session supervision'
-grep -Fq 'effort: medium' "$ROOT_DIR/agents/claudex-luna.md" || fail 'Luna must use medium effort'
-grep -Fq 'model_reasoning_effort = "medium"' "$ROOT_DIR/codex/agents/claudex-luna.toml" || fail 'Codex Luna mirror must use medium effort'
+grep -Fq 'effort: high' "$ROOT_DIR/agents/claudex-luna.md" || fail 'Luna must use high effort'
+grep -Fq 'model_reasoning_effort = "high"' "$ROOT_DIR/codex/agents/claudex-luna.toml" || fail 'Codex Luna mirror must use high effort'
 grep -Fq 'effort: medium' "$ROOT_DIR/agents/claudex-sol.md" || fail 'Sol advisory must use medium effort'
 grep -Fq 'effort: medium' "$ROOT_DIR/agents/claudex-sol-review.md" || fail 'Sol Review must use medium effort'
 grep -Fq 'model: gpt-5.6-terra' "$ROOT_DIR/agents/claudex-frontend.md" || fail 'Frontend must use Terra'
@@ -713,7 +713,7 @@ assert {record['event'] for record in records} >= {'proxy_ready', 'launch_comple
 launch = next(record for record in reversed(records) if record['event'] == 'launch_completed')
 assert launch['mode'] == 'luna', launch
 assert launch['route'] == 'custom', launch
-assert launch['effort'] == 'medium', launch
+assert launch['effort'] == 'high', launch
 assert launch['autocompact'] == 'custom', launch
 assert launch['launcher_revision'] == 2, launch
 assert launch['exit_code'] == 0 and launch['elapsed_ms'] >= 0, launch
@@ -776,7 +776,7 @@ FRONTEND_ARGS="$TMP_DIR/frontend-args"
 SOL_REVIEW_ARGS="$TMP_DIR/sol-review-args"
 (cd "$REPO" && env "${CLAUDEX_TEST_ENV[@]}" MOCK_CLAUDE_ARGS_LOG="$LUNA_ARGS" "$ROOT_DIR/bin/claudex" luna 'research fixture' >/dev/null)
 grep -Fxq 'claudex-luna' "$LUNA_ARGS" || fail 'Luna must select claudex-luna'
-grep -Fxq 'medium' "$LUNA_ARGS" || fail 'Luna must use medium effort'
+grep -Fxq 'high' "$LUNA_ARGS" || fail 'Luna must use high effort'
 (cd "$REPO" && env "${CLAUDEX_TEST_ENV[@]}" MOCK_CLAUDE_ARGS_LOG="$SOL_ADVISORY_ARGS" "$ROOT_DIR/bin/claudex" sol 'advisory fixture' >/dev/null)
 grep -Fxq -- '--agent' "$SOL_ADVISORY_ARGS" || fail 'Sol advisory must select a custom agent'
 grep -Fxq 'claudex-sol' "$SOL_ADVISORY_ARGS" || fail 'Sol advisory must select claudex-sol'

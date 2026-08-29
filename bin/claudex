@@ -254,7 +254,7 @@ PY
 }
 
 case "${1:-}" in
-  luna) TELEMETRY_MODE="luna"; TELEMETRY_ROUTE="$(telemetry_route "$LUNA_MODEL")"; TELEMETRY_EFFORT="medium" ;;
+  luna) TELEMETRY_MODE="luna"; TELEMETRY_ROUTE="$(telemetry_route "$LUNA_MODEL")"; TELEMETRY_EFFORT="high" ;;
   sol) TELEMETRY_MODE="sol"; TELEMETRY_ROUTE="$(telemetry_route "$SOL_MODEL")"; TELEMETRY_EFFORT="medium" ;;
   frontend) TELEMETRY_MODE="frontend"; TELEMETRY_ROUTE="frontend"; TELEMETRY_EFFORT="high" ;;
   sol-review) TELEMETRY_MODE="sol-review"; TELEMETRY_ROUTE="$(telemetry_route "$SOL_MODEL")"; TELEMETRY_EFFORT="medium" ;;
@@ -334,7 +334,7 @@ run_terra() {
 run_luna() {
   [[ $# -gt 0 ]] || { echo 'Claudex: luna requires a task prompt.' >&2; exit 2; }
   reject_role_effort_override "$@"
-  claude_command --agent claudex-luna --model "$LUNA_MODEL" --effort medium --permission-mode plan --autocompact "$AUTOCOMPACT" "$@"
+  claude_command --agent claudex-luna --model "$LUNA_MODEL" --effort high --permission-mode plan --autocompact "$AUTOCOMPACT" "$@"
 }
 run_sol() {
   [[ $# -gt 0 ]] || { echo 'Claudex: sol requires a task prompt.' >&2; exit 2; }

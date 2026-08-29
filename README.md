@@ -6,7 +6,7 @@ Defaults:
 
 - Coordinator: `gpt-5.6-sol` / low — permanent coordinator, small-edit executor, and final integrator (`terra` remains a compatibility alias)
 - Implementer: `gpt-5.6-sol` / low — bounded substantial non-frontend implementation
-- Luna: `gpt-5.6-luna` / medium — read-only research and data-operations worker
+- Luna: `gpt-5.6-luna` / high — read-only research and data-operations worker
 - Frontend: `gpt-5.6-terra` / high — bounded GUI/frontend implementation and code-generation worker
 - Sol advisory: `gpt-5.6-sol` / medium — read-only architecture advice and early risk triage
 - Sol Review: `gpt-5.6-sol` / medium — read-only consequential-change and final-review gate
@@ -152,7 +152,7 @@ The installer refreshes these source-controlled Claude Code custom agents into `
 | --- | --- | --- | --- |
 | `claudex-terra` | `gpt-5.6-sol` / low | default | Default coordinator, small-edit executor, verification synthesizer, and final integrator; `terra` remains a compatibility alias for the main `claudex` route. |
 | `claudex-implementer` | `gpt-5.6-sol` / low | default | Substantial, bounded non-frontend implementation after behavior, acceptance criteria, exclusive ownership, relevant Sol decisions when applicable, and checks are explicit. |
-| `claudex-luna` | `gpt-5.6-luna` / medium | plan | Read-only research and data-analysis specialist for broad inventories, maps, structured-data inspection, validation anomalies, naming/stale-reference audits, log/test/diff classification, broad diff-risk maps, and concise evidence summaries. |
+| `claudex-luna` | `gpt-5.6-luna` / high | plan | Read-only research and data-analysis specialist for broad inventories, maps, structured-data inspection, validation anomalies, naming/stale-reference audits, log/test/diff classification, broad diff-risk maps, and concise evidence summaries. |
 | `claudex-sol` | `gpt-5.6-sol` / medium | plan | Mandatory read-only advisory for implementation plans and architecture choices, plus bounded alternatives and early risk triage. |
 | `claudex-sol-review` | `gpt-5.6-sol` / medium | plan | Read-only consequential-change and final-review gate returning `PASS`, `CHANGES_REQUIRED`, or `BLOCKED`. |
 | `claudex-frontend` | `gpt-5.6-terra` / high | default | Bounded frontend implementer for UI components, styling, accessibility, responsive behavior, visual regressions, frontend tests, and frontend-local assets. |
@@ -175,7 +175,7 @@ For difficult bugs and performance regressions, Claudex first seeks a runnable f
 
 Claudex applies YAGNI, avoids speculative compatibility and fallback layers, uses focused tests for meaningful current behavior, and matches planning, delegation, and verification ceremony to task size. Review feedback cannot expand the original goal. Human-facing summaries lead with the problem and outcome rather than an implementation inventory. Persistent global guidance requires repeated observed failure, and skill descriptions stay focused on trigger conditions.
 
-Implementer, Luna, Frontend, Sol advisory, and Sol Review are ordinary Claude Code custom agents with fixed `low`, `medium`, `high`, `medium`, and `medium` effort respectively. Implementer uses GPT-5.6 Sol at low effort for bounded non-frontend implementation; Sol advisory and Sol Review remain read-only roles. Frontend's agent, model, and effort are intentionally fixed and cannot be overridden from its command. Existing users must rerun the installer after updating Claudex, then restart Claude Code or use `/agents` to reload the definitions.
+Implementer, Luna, Frontend, Sol advisory, and Sol Review are ordinary Claude Code custom agents with fixed `low`, `high`, `high`, `medium`, and `medium` effort respectively. Implementer uses GPT-5.6 Sol at low effort for bounded non-frontend implementation; Sol advisory and Sol Review remain read-only roles. Frontend's agent, model, and effort are intentionally fixed and cannot be overridden from its command. Existing users must rerun the installer after updating Claudex, then restart Claude Code or use `/agents` to reload the definitions.
 
 ### Context and cost discipline
 
@@ -249,7 +249,7 @@ Supported variables:
 | `CLAUDEX_PROXY_CONFIG` | `~/.config/claudex/cliproxyapi.yaml` | Proxy configuration |
 | `CLAUDEX_TOKEN_FILE` | `~/.config/claudex/token` | Local proxy token |
 
-`CLAUDEX_EFFORT` and a compatibility `terra` CLI `--effort` argument control only the main GPT-5.6 Sol session. Implementer, Luna, Frontend, Sol advisory, and Sol Review have fixed role efforts (`low`, `medium`, `high`, `medium`, and `medium`). Frontend also fixes its agent and model to `claudex-frontend` and `gpt-5.6-terra`; its command rejects agent, model, and effort overrides. `xhigh` is unsupported and rejected before Claudex starts or probes the proxy.
+`CLAUDEX_EFFORT` and a compatibility `terra` CLI `--effort` argument control only the main GPT-5.6 Sol session. Implementer, Luna, Frontend, Sol advisory, and Sol Review have fixed role efforts (`low`, `high`, `high`, `medium`, and `medium`). Frontend also fixes its agent and model to `claudex-frontend` and `gpt-5.6-terra`; its command rejects agent, model, and effort overrides. `xhigh` is unsupported and rejected before Claudex starts or probes the proxy.
 
 Claudex bypasses Claude Code permission prompts by default. Re-enable them for one session:
 
